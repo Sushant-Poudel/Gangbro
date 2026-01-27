@@ -149,40 +149,33 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+# ==================== FIXED ADMIN CREDENTIALS ====================
+ADMIN_USERNAME = "gsnadmin"
+ADMIN_PASSWORD = "gsnadmin"
+
 # ==================== AUTH ROUTES ====================
 
 @api_router.post("/auth/register")
 async def register(user_data: UserCreate):
-    existing = await db.users.find_one({"email": user_data.email})
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    user = User(
-        email=user_data.email,
-        name=user_data.name,
-        is_admin=True
-    )
-    user_dict = user.model_dump()
-    user_dict["password_hash"] = hash_password(user_data.password)
-    
-    await db.users.insert_one(user_dict)
-    token = create_token(user.id)
-    
-    return {"token": token, "user": user.model_dump()}
+    # Registration disabled - only fixed admin account allowed
+    raise HTTPException(status_code=403, detail="Registration disabled. Use admin credentials.")
 
 @api_router.post("/auth/login")
 async def login(credentials: UserLogin):
-    user = await db.users.find_one({"email": credentials.email}, {"_id": 0})
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+    # Check against fixed admin credentials
+    if credentials.email == ADMIN_USERNAME and credentials.password == ADMIN_PASSWORD:
+        token = create_token("admin-fixed")
+        return {
+            "token": token, 
+            "user": {
+                "id": "admin-fixed",
+                "email": ADMIN_USERNAME,
+                "name": "Admin",
+                "is_admin": True
+            }
+        }
     
-    if user.get("password_hash") != hash_password(credentials.password):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    token = create_token(user["id"])
-    user_response = {k: v for k, v in user.items() if k != "password_hash"}
-    
-    return {"token": token, "user": user_response}
+    raise HTTPException(status_code=401, detail="Invalid credentials")
 
 @api_router.get("/auth/me")
 async def get_me(current_user: dict = Depends(get_current_user)):
