@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, X, ChevronDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, X } from 'lucide-react';
 import AdminLayout from '@/components/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -142,13 +142,13 @@ export default function AdminProducts() {
 
   return (
     <AdminLayout title="Products">
-      <div className="space-y-6" data-testid="admin-products">
+      <div className="space-y-4 lg:space-y-6" data-testid="admin-products">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <p className="text-white/60">Manage your product catalog</p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <p className="text-white/60 text-sm lg:text-base">Manage your product catalog</p>
           <Button 
             onClick={() => handleOpenDialog()}
-            className="bg-gold-500 hover:bg-gold-600 text-black"
+            className="bg-gold-500 hover:bg-gold-600 text-black w-full sm:w-auto"
             data-testid="add-product-btn"
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -156,8 +156,65 @@ export default function AdminProducts() {
           </Button>
         </div>
 
-        {/* Products Table */}
-        <div className="bg-card border border-white/10 rounded-lg overflow-hidden">
+        {/* Products - Mobile Cards / Desktop Table */}
+        <div className="lg:hidden space-y-3">
+          {isLoading ? (
+            <div className="text-center py-8 text-white/40">Loading...</div>
+          ) : products.length === 0 ? (
+            <div className="text-center py-8 text-white/40">No products found</div>
+          ) : (
+            products.map((product) => (
+              <div 
+                key={product.id} 
+                className="bg-card border border-white/10 rounded-lg p-4"
+                data-testid={`product-card-${product.id}`}
+              >
+                <div className="flex items-start gap-3">
+                  <img 
+                    src={product.image_url} 
+                    alt={product.name}
+                    className="w-16 h-16 rounded object-cover flex-shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-white font-medium truncate">{product.name}</h3>
+                    <p className="text-white/60 text-sm">{getCategoryName(product.category_id)}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-white/40 text-xs">{product.variations?.length || 0} variations</span>
+                      {product.is_sold_out ? (
+                        <span className="text-red-400 text-xs">Sold Out</span>
+                      ) : product.is_active ? (
+                        <span className="text-green-400 text-xs">Active</span>
+                      ) : (
+                        <span className="text-yellow-400 text-xs">Inactive</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleOpenDialog(product)}
+                      className="text-white/60 hover:text-gold-500 p-2"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(product.id)}
+                      className="text-white/60 hover:text-red-500 p-2"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop Table */}
+        <div className="hidden lg:block bg-card border border-white/10 rounded-lg overflow-hidden">
           <table className="w-full admin-table">
             <thead>
               <tr className="border-b border-white/10">
@@ -230,15 +287,15 @@ export default function AdminProducts() {
 
         {/* Product Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="bg-card border-white/10 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="bg-card border-white/10 text-white max-w-2xl max-h-[90vh] overflow-y-auto mx-4">
             <DialogHeader>
               <DialogTitle className="font-heading text-xl uppercase">
                 {editingProduct ? 'Edit Product' : 'Add Product'}
               </DialogTitle>
             </DialogHeader>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleSubmit} className="space-y-4 lg:space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Product Name</Label>
                   <Input
@@ -284,32 +341,32 @@ export default function AdminProducts() {
                 <Textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="bg-black border-white/20 min-h-[150px]"
+                  className="bg-black border-white/20 min-h-[100px] lg:min-h-[150px]"
                   placeholder="<p>Product description...</p>"
                   data-testid="product-description-input"
                 />
               </div>
 
               {/* Variations */}
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <Label>Variations</Label>
                 
                 {/* Existing Variations */}
                 {formData.variations.length > 0 && (
                   <div className="space-y-2">
                     {formData.variations.map((v) => (
-                      <div key={v.id} className="flex items-center gap-4 bg-black p-3 rounded-lg">
-                        <span className="flex-1 text-white">{v.name}</span>
+                      <div key={v.id} className="flex items-center gap-2 lg:gap-4 bg-black p-2 lg:p-3 rounded-lg text-sm">
+                        <span className="flex-1 text-white truncate">{v.name}</span>
                         <span className="text-gold-500">Rs {v.price}</span>
                         {v.original_price && (
-                          <span className="text-white/40 line-through">Rs {v.original_price}</span>
+                          <span className="text-white/40 line-through hidden sm:inline">Rs {v.original_price}</span>
                         )}
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
                           onClick={() => handleRemoveVariation(v.id)}
-                          className="text-red-400 hover:text-red-300"
+                          className="text-red-400 hover:text-red-300 p-1"
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -319,12 +376,12 @@ export default function AdminProducts() {
                 )}
 
                 {/* Add New Variation */}
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
                   <Input
                     value={newVariation.name}
                     onChange={(e) => setNewVariation({ ...newVariation, name: e.target.value })}
                     placeholder="Plan name"
-                    className="bg-black border-white/20"
+                    className="bg-black border-white/20 col-span-2 lg:col-span-1"
                     data-testid="variation-name-input"
                   />
                   <Input
@@ -339,15 +396,15 @@ export default function AdminProducts() {
                     type="number"
                     value={newVariation.original_price}
                     onChange={(e) => setNewVariation({ ...newVariation, original_price: e.target.value })}
-                    placeholder="Original (optional)"
-                    className="bg-black border-white/20"
+                    placeholder="Original"
+                    className="bg-black border-white/20 hidden lg:block"
                     data-testid="variation-original-price-input"
                   />
                   <Button
                     type="button"
                     onClick={handleAddVariation}
                     variant="outline"
-                    className="border-gold-500 text-gold-500"
+                    className="border-gold-500 text-gold-500 col-span-2 lg:col-span-1"
                     data-testid="add-variation-btn"
                   >
                     Add
@@ -356,14 +413,14 @@ export default function AdminProducts() {
               </div>
 
               {/* Status Toggles */}
-              <div className="flex items-center gap-8">
+              <div className="flex items-center gap-6 lg:gap-8">
                 <div className="flex items-center gap-2">
                   <Switch
                     checked={formData.is_active}
                     onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
                     data-testid="product-active-toggle"
                   />
-                  <Label>Active</Label>
+                  <Label className="text-sm">Active</Label>
                 </div>
                 <div className="flex items-center gap-2">
                   <Switch
@@ -371,21 +428,22 @@ export default function AdminProducts() {
                     onCheckedChange={(checked) => setFormData({ ...formData, is_sold_out: checked })}
                     data-testid="product-soldout-toggle"
                   />
-                  <Label>Sold Out</Label>
+                  <Label className="text-sm">Sold Out</Label>
                 </div>
               </div>
 
-              <div className="flex justify-end gap-4">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-3">
                 <Button
                   type="button"
                   variant="ghost"
                   onClick={() => setIsDialogOpen(false)}
+                  className="w-full sm:w-auto"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
-                  className="bg-gold-500 hover:bg-gold-600 text-black"
+                  className="bg-gold-500 hover:bg-gold-600 text-black w-full sm:w-auto"
                   data-testid="save-product-btn"
                 >
                   {editingProduct ? 'Update' : 'Create'} Product
