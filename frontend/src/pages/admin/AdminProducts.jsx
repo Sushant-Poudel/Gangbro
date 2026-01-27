@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, X } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { Plus, Pencil, Trash2, X, Upload, Image } from 'lucide-react';
 import AdminLayout from '@/components/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { productsAPI, categoriesAPI } from '@/lib/api';
+import { productsAPI, categoriesAPI, uploadAPI } from '@/lib/api';
 
 const emptyProduct = {
   name: '',
@@ -36,6 +36,9 @@ export default function AdminProducts() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [formData, setFormData] = useState(emptyProduct);
   const [newVariation, setNewVariation] = useState(emptyVariation);
+  const [isUploading, setIsUploading] = useState(false);
+  const [imagePreview, setImagePreview] = useState('');
+  const fileInputRef = useRef(null);
 
   const fetchData = async () => {
     try {
@@ -68,12 +71,43 @@ export default function AdminProducts() {
         is_active: product.is_active,
         is_sold_out: product.is_sold_out
       });
+      setImagePreview(product.image_url);
     } else {
       setEditingProduct(null);
       setFormData(emptyProduct);
+      setImagePreview('');
     }
     setNewVariation(emptyVariation);
     setIsDialogOpen(true);
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB');
+      return;
+    }
+
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = (e) => setImagePreview(e.target.result);
+    reader.readAsDataURL(file);
+
+    setIsUploading(true);
+    try {
+      const res = await uploadAPI.uploadImage(file);
+      const imageUrl = uploadAPI.getImageUrl(res.data.url);
+      setFormData({ ...formData, image_url: imageUrl });
+      toast.success('Image uploaded!');
+    } catch (error) {
+      toast.error('Failed to upload image');
+      setImagePreview('');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleAddVariation = () => {
@@ -103,6 +137,16 @@ export default function AdminProducts() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!formData.image_url) {
+      toast.error('Please upload an image');
+      return;
+    }
+    
+    if (!formData.category_id) {
+      toast.error('Please select a category');
+      return;
+    }
     
     if (formData.variations.length === 0) {
       toast.error('Add at least one variation');
@@ -156,12 +200,22 @@ export default function AdminProducts() {
           </Button>
         </div>
 
+        {/* No Categories Warning */}
+        {!isLoading && categories.length === 0 && (
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 text-yellow-400 text-sm">
+            Please create categories first before adding products. Go to Categories section.
+          </div>
+        )}
+
         {/* Products - Mobile Cards / Desktop Table */}
         <div className="lg:hidden space-y-3">
           {isLoading ? (
             <div className="text-center py-8 text-white/40">Loading...</div>
           ) : products.length === 0 ? (
-            <div className="text-center py-8 text-white/40">No products found</div>
+            <div className="text-center py-12 bg-card border border-white/10 rounded-lg">
+              <Image className="h-12 w-12 mx-auto text-white/20 mb-4" />
+              <p className="text-white/40">No products yet</p>
+            </div>
           ) : (
             products.map((product) => (
               <div 
@@ -232,7 +286,7 @@ export default function AdminProducts() {
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-white/40">No products found</td>
+                  <td colSpan={5} className="px-6 py-12 text-center text-white/40">No products yet</td>
                 </tr>
               ) : (
                 products.map((product) => (
@@ -295,6 +349,45 @@ export default function AdminProducts() {
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="space-y-4 lg:space-y-6">
+              {/* Image Upload */}
+              <div className="space-y-2">
+                <Label>Product Image</Label>
+                <div 
+                  className="border-2 border-dashed border-white/20 rounded-lg p-4 text-center cursor-pointer hover:border-gold-500/50 transition-colors"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {imagePreview ? (
+                    <div className="relative">
+                      <img 
+                        src={imagePreview} 
+                        alt="Preview" 
+                        className="w-32 h-32 object-cover rounded-lg mx-auto"
+                      />
+                      <p className="text-white/40 text-xs mt-2">Click to change image</p>
+                    </div>
+                  ) : (
+                    <div className="py-4">
+                      <Upload className="h-8 w-8 mx-auto text-white/40 mb-2" />
+                      <p className="text-white/60 text-sm">Click to upload image</p>
+                      <p className="text-white/40 text-xs mt-1">PNG, JPG, WebP (max 5MB)</p>
+                    </div>
+                  )}
+                  {isUploading && (
+                    <div className="mt-2">
+                      <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-gold-500 mx-auto"></div>
+                    </div>
+                  )}
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  data-testid="product-image-input"
+                />
+              </div>
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Product Name</Label>
@@ -302,6 +395,7 @@ export default function AdminProducts() {
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="bg-black border-white/20"
+                    placeholder="e.g. Netflix Premium"
                     required
                     data-testid="product-name-input"
                   />
@@ -316,24 +410,16 @@ export default function AdminProducts() {
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                      ))}
+                      {categories.length === 0 ? (
+                        <SelectItem value="" disabled>No categories - create one first</SelectItem>
+                      ) : (
+                        categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Image URL</Label>
-                <Input
-                  value={formData.image_url}
-                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                  className="bg-black border-white/20"
-                  placeholder="https://..."
-                  required
-                  data-testid="product-image-input"
-                />
               </div>
 
               <div className="space-y-2">
@@ -342,14 +428,14 @@ export default function AdminProducts() {
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="bg-black border-white/20 min-h-[100px] lg:min-h-[150px]"
-                  placeholder="<p>Product description...</p>"
+                  placeholder="<p>Product description...</p><ul><li>Feature 1</li></ul>"
                   data-testid="product-description-input"
                 />
               </div>
 
               {/* Variations */}
               <div className="space-y-3">
-                <Label>Variations</Label>
+                <Label>Pricing Variations</Label>
                 
                 {/* Existing Variations */}
                 {formData.variations.length > 0 && (
@@ -380,7 +466,7 @@ export default function AdminProducts() {
                   <Input
                     value={newVariation.name}
                     onChange={(e) => setNewVariation({ ...newVariation, name: e.target.value })}
-                    placeholder="Plan name"
+                    placeholder="Plan name (e.g. 1 Month)"
                     className="bg-black border-white/20 col-span-2 lg:col-span-1"
                     data-testid="variation-name-input"
                   />
@@ -396,7 +482,7 @@ export default function AdminProducts() {
                     type="number"
                     value={newVariation.original_price}
                     onChange={(e) => setNewVariation({ ...newVariation, original_price: e.target.value })}
-                    placeholder="Original"
+                    placeholder="Original (optional)"
                     className="bg-black border-white/20 hidden lg:block"
                     data-testid="variation-original-price-input"
                   />
@@ -407,7 +493,7 @@ export default function AdminProducts() {
                     className="border-gold-500 text-gold-500 col-span-2 lg:col-span-1"
                     data-testid="add-variation-btn"
                   >
-                    Add
+                    Add Variation
                   </Button>
                 </div>
               </div>
