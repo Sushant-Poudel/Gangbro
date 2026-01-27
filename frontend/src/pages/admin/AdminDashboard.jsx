@@ -81,6 +81,14 @@ export default function AdminDashboard() {
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-4">
             <Link
+              to="/admin/categories"
+              className="flex items-center gap-3 p-3 lg:p-4 bg-black rounded-lg border border-white/10 hover:border-gold-500/50 transition-all"
+              data-testid="quick-action-categories"
+            >
+              <FolderOpen className="h-5 w-5 text-gold-500 flex-shrink-0" />
+              <span className="text-white text-sm lg:text-base">Manage Categories</span>
+            </Link>
+            <Link
               to="/admin/products"
               className="flex items-center gap-3 p-3 lg:p-4 bg-black rounded-lg border border-white/10 hover:border-gold-500/50 transition-all"
               data-testid="quick-action-products"
@@ -95,14 +103,6 @@ export default function AdminDashboard() {
             >
               <Star className="h-5 w-5 text-gold-500 flex-shrink-0" />
               <span className="text-white text-sm lg:text-base">Manage Reviews</span>
-            </Link>
-            <Link
-              to="/admin/pages"
-              className="flex items-center gap-3 p-3 lg:p-4 bg-black rounded-lg border border-white/10 hover:border-gold-500/50 transition-all"
-              data-testid="quick-action-pages"
-            >
-              <FileText className="h-5 w-5 text-gold-500 flex-shrink-0" />
-              <span className="text-white text-sm lg:text-base">Edit Pages</span>
             </Link>
           </div>
         </div>
