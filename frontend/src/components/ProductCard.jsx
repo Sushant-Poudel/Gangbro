@@ -26,7 +26,7 @@ export default function ProductCard({ product }) {
         {/* Sold Out Overlay */}
         {product.is_sold_out && (
           <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
-            <Badge variant="destructive" className="text-sm font-heading uppercase tracking-wider">
+            <Badge variant="destructive" className="text-xs lg:text-sm font-heading uppercase tracking-wider">
               Sold Out
             </Badge>
           </div>
@@ -34,8 +34,8 @@ export default function ProductCard({ product }) {
 
         {/* Discount Badge */}
         {hasDiscount && !product.is_sold_out && (
-          <div className="absolute top-2 right-2">
-            <Badge className="bg-green-600 text-white text-xs font-semibold">
+          <div className="absolute top-1.5 right-1.5 lg:top-2 lg:right-2">
+            <Badge className="bg-green-600 text-white text-[10px] lg:text-xs font-semibold px-1.5 lg:px-2">
               SALE
             </Badge>
           </div>
@@ -43,17 +43,17 @@ export default function ProductCard({ product }) {
       </div>
 
       {/* Content */}
-      <div className="p-4">
-        <h3 className="font-heading text-lg font-semibold text-white truncate group-hover:text-gold-500 transition-colors">
+      <div className="p-2.5 lg:p-4">
+        <h3 className="font-heading text-sm lg:text-lg font-semibold text-white truncate group-hover:text-gold-500 transition-colors">
           {product.name}
         </h3>
         
-        <div className="mt-2 flex items-baseline gap-2">
-          <span className="text-gold-500 font-bold text-lg">
+        <div className="mt-1 lg:mt-2 flex items-baseline gap-1 lg:gap-2">
+          <span className="text-gold-500 font-bold text-sm lg:text-lg">
             Rs {lowestPrice.toLocaleString()}
           </span>
           {product.variations?.length > 1 && (
-            <span className="text-white/40 text-sm">onwards</span>
+            <span className="text-white/40 text-[10px] lg:text-sm">onwards</span>
           )}
         </div>
       </div>
