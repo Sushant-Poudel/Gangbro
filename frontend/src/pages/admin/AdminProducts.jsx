@@ -403,7 +403,7 @@ export default function AdminProducts() {
                 <div className="space-y-2">
                   <Label>Category</Label>
                   <Select 
-                    value={formData.category_id} 
+                    value={formData.category_id || undefined} 
                     onValueChange={(value) => setFormData({ ...formData, category_id: value })}
                   >
                     <SelectTrigger className="bg-black border-white/20" data-testid="product-category-select">
@@ -411,7 +411,7 @@ export default function AdminProducts() {
                     </SelectTrigger>
                     <SelectContent>
                       {categories.length === 0 ? (
-                        <SelectItem value="" disabled>No categories - create one first</SelectItem>
+                        <SelectItem value="none" disabled>No categories - create one first</SelectItem>
                       ) : (
                         categories.map((cat) => (
                           <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
