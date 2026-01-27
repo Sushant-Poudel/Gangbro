@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Package, Star, FileText, Share2 } from 'lucide-react';
+import { Package, FolderOpen, Star, FileText, Share2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import AdminLayout from '@/components/AdminLayout';
-import { productsAPI, reviewsAPI, socialLinksAPI } from '@/lib/api';
+import { productsAPI, categoriesAPI, reviewsAPI, socialLinksAPI } from '@/lib/api';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
     products: 0,
+    categories: 0,
     reviews: 0,
     socialLinks: 0
   });
@@ -15,14 +16,16 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [productsRes, reviewsRes, linksRes] = await Promise.all([
+        const [productsRes, categoriesRes, reviewsRes, linksRes] = await Promise.all([
           productsAPI.getAll(null, false),
+          categoriesAPI.getAll(),
           reviewsAPI.getAll(),
           socialLinksAPI.getAll()
         ]);
         
         setStats({
           products: productsRes.data.length,
+          categories: categoriesRes.data.length,
           reviews: reviewsRes.data.length,
           socialLinks: linksRes.data.length
         });
@@ -37,10 +40,10 @@ export default function AdminDashboard() {
   }, []);
 
   const statCards = [
-    { label: 'Products', value: stats.products, icon: Package, color: 'bg-blue-500/10 text-blue-500' },
-    { label: 'Reviews', value: stats.reviews, icon: Star, color: 'bg-gold-500/10 text-gold-500' },
-    { label: 'Social Links', value: stats.socialLinks, icon: Share2, color: 'bg-green-500/10 text-green-500' },
-    { label: 'Pages', value: 3, icon: FileText, color: 'bg-purple-500/10 text-purple-500' },
+    { label: 'Categories', value: stats.categories, icon: FolderOpen, color: 'bg-purple-500/10 text-purple-500', link: '/admin/categories' },
+    { label: 'Products', value: stats.products, icon: Package, color: 'bg-blue-500/10 text-blue-500', link: '/admin/products' },
+    { label: 'Reviews', value: stats.reviews, icon: Star, color: 'bg-gold-500/10 text-gold-500', link: '/admin/reviews' },
+    { label: 'Social Links', value: stats.socialLinks, icon: Share2, color: 'bg-green-500/10 text-green-500', link: '/admin/social-links' },
   ];
 
   return (
