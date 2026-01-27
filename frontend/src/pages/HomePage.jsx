@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Star, ExternalLink, Shield, Clock, Headphones } from 'lucide-react';
+import { Star, ExternalLink } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import ProductCard from '@/components/ProductCard';
