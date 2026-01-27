@@ -1,5 +1,6 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -13,9 +14,15 @@ from datetime import datetime, timezone, timedelta
 import hashlib
 import jwt
 import secrets
+import base64
+import shutil
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+
+# Create uploads directory
+UPLOADS_DIR = ROOT_DIR / "uploads"
+UPLOADS_DIR.mkdir(exist_ok=True)
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -100,9 +107,9 @@ class Review(BaseModel):
 
 class PageContent(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    page_key: str  # about, contact, faq
+    page_key: str
     title: str
-    content: str  # HTML content
+    content: str
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 class SocialLinkCreate(BaseModel):
@@ -116,6 +123,9 @@ class SocialLink(BaseModel):
     platform: str
     url: str
     icon: Optional[str] = None
+
+class CategoryCreate(BaseModel):
+    name: str
 
 class Category(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -161,12 +171,10 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 @api_router.post("/auth/register")
 async def register(user_data: UserCreate):
-    # Registration disabled - only fixed admin account allowed
     raise HTTPException(status_code=403, detail="Registration disabled. Use admin credentials.")
 
 @api_router.post("/auth/login")
 async def login(credentials: UserLogin):
-    # Check against fixed admin credentials
     if credentials.email == ADMIN_USERNAME and credentials.password == ADMIN_PASSWORD:
         token = create_token("admin-fixed")
         return {
@@ -178,12 +186,40 @@ async def login(credentials: UserLogin):
                 "is_admin": True
             }
         }
-    
     raise HTTPException(status_code=401, detail="Invalid credentials")
 
 @api_router.get("/auth/me")
 async def get_me(current_user: dict = Depends(get_current_user)):
     return current_user
+
+# ==================== IMAGE UPLOAD ====================
+
+@api_router.post("/upload")
+async def upload_image(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/png", "image/webp", "image/gif"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Invalid file type. Only JPEG, PNG, WebP, GIF allowed.")
+    
+    # Generate unique filename
+    file_ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
+    filename = f"{uuid.uuid4()}.{file_ext}"
+    file_path = UPLOADS_DIR / filename
+    
+    # Save file
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    # Return the URL path
+    return {"url": f"/api/uploads/{filename}"}
+
+@api_router.get("/uploads/{filename}")
+async def get_uploaded_image(filename: str):
+    from fastapi.responses import FileResponse
+    file_path = UPLOADS_DIR / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Image not found")
+    return FileResponse(file_path)
 
 # ==================== CATEGORY ROUTES ====================
 
@@ -193,11 +229,29 @@ async def get_categories():
     return categories
 
 @api_router.post("/categories", response_model=Category)
-async def create_category(name: str, current_user: dict = Depends(get_current_user)):
-    slug = name.lower().replace(" ", "-")
-    category = Category(name=name, slug=slug)
+async def create_category(category_data: CategoryCreate, current_user: dict = Depends(get_current_user)):
+    slug = category_data.name.lower().replace(" ", "-").replace("&", "and")
+    category = Category(name=category_data.name, slug=slug)
     await db.categories.insert_one(category.model_dump())
     return category
+
+@api_router.put("/categories/{category_id}", response_model=Category)
+async def update_category(category_id: str, category_data: CategoryCreate, current_user: dict = Depends(get_current_user)):
+    existing = await db.categories.find_one({"id": category_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Category not found")
+    
+    slug = category_data.name.lower().replace(" ", "-").replace("&", "and")
+    await db.categories.update_one({"id": category_id}, {"$set": {"name": category_data.name, "slug": slug}})
+    updated = await db.categories.find_one({"id": category_id}, {"_id": 0})
+    return updated
+
+@api_router.delete("/categories/{category_id}")
+async def delete_category(category_id: str, current_user: dict = Depends(get_current_user)):
+    result = await db.categories.delete_one({"id": category_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return {"message": "Category deleted"}
 
 # ==================== PRODUCT ROUTES ====================
 
@@ -233,7 +287,6 @@ async def update_product(product_id: str, product_data: ProductCreate, current_u
     
     update_data = product_data.model_dump()
     await db.products.update_one({"id": product_id}, {"$set": update_data})
-    
     updated = await db.products.find_one({"id": product_id}, {"_id": 0})
     return updated
 
@@ -271,7 +324,6 @@ async def update_review(review_id: str, review_data: ReviewCreate, current_user:
     update_data = review_data.model_dump()
     update_data["review_date"] = review_data.review_date or existing.get("review_date")
     await db.reviews.update_one({"id": review_id}, {"$set": update_data})
-    
     updated = await db.reviews.find_one({"id": review_id}, {"_id": 0})
     return updated
 
@@ -288,7 +340,6 @@ async def delete_review(review_id: str, current_user: dict = Depends(get_current
 async def get_page(page_key: str):
     page = await db.pages.find_one({"page_key": page_key}, {"_id": 0})
     if not page:
-        # Return default content
         defaults = {
             "about": {"title": "About Us", "content": "<p>Welcome to GameShop Nepal - Your trusted source for digital products since 2021.</p>"},
             "contact": {"title": "Contact Us", "content": "<p>Email: support@gameshopnepal.com</p>"},
@@ -338,216 +389,19 @@ async def delete_social_link(link_id: str, current_user: dict = Depends(get_curr
         raise HTTPException(status_code=404, detail="Social link not found")
     return {"message": "Social link deleted"}
 
+# ==================== CLEAR DATA (Admin Only) ====================
+
+@api_router.post("/clear-products")
+async def clear_products(current_user: dict = Depends(get_current_user)):
+    await db.products.delete_many({})
+    await db.categories.delete_many({})
+    return {"message": "All products and categories cleared"}
+
 # ==================== SEED DATA ====================
 
 @api_router.post("/seed")
 async def seed_data():
-    # Seed categories
-    categories_data = [
-        {"id": "gaming", "name": "Gaming", "slug": "gaming"},
-        {"id": "ott", "name": "OTT Subscriptions", "slug": "ott-subscriptions"},
-        {"id": "software", "name": "Software", "slug": "software"},
-        {"id": "ai-tools", "name": "AI Tools", "slug": "ai-tools"},
-        {"id": "topups", "name": "Top-ups", "slug": "top-ups"},
-    ]
-    
-    for cat in categories_data:
-        await db.categories.update_one({"id": cat["id"]}, {"$set": cat}, upsert=True)
-    
-    # Seed products
-    products_data = [
-        {
-            "id": "capcut",
-            "name": "Capcut Pro",
-            "description": "<p><strong>Capcut Pro</strong> - Professional video editing app with premium features.</p><ul><li>All premium filters and effects</li><li>No watermark</li><li>Cloud storage</li><li>Priority support</li></ul>",
-            "image_url": "https://storage.googleapis.com/takeapp/media/cmj056qc5000404js081q0fus.jpeg",
-            "category_id": "software",
-            "variations": [
-                {"id": "capcut-1m", "name": "1 Month", "price": 399, "original_price": 599},
-                {"id": "capcut-3m", "name": "3 Months", "price": 999, "original_price": 1499},
-                {"id": "capcut-1y", "name": "1 Year", "price": 1500, "original_price": 2999}
-            ],
-            "is_active": True,
-            "is_sold_out": False,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        },
-        {
-            "id": "canva-pro",
-            "name": "Canva Pro",
-            "description": "<p><strong>Canva Pro</strong> - Design anything with premium templates and features.</p><ul><li>100+ million premium stock photos</li><li>610,000+ premium templates</li><li>Background remover</li><li>Brand kit</li></ul>",
-            "image_url": "https://storage.googleapis.com/takeapp/media/cmkqjf5u9000104l88ttaexth.jpeg",
-            "category_id": "software",
-            "variations": [
-                {"id": "canva-1m", "name": "1 Month", "price": 299, "original_price": 499},
-                {"id": "canva-6m", "name": "6 Months", "price": 999, "original_price": 1999},
-                {"id": "canva-1y", "name": "1 Year", "price": 1499, "original_price": 2999}
-            ],
-            "is_active": True,
-            "is_sold_out": False,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        },
-        {
-            "id": "gemini-pro",
-            "name": "Gemini Pro",
-            "description": "<p><strong>Google Gemini Pro</strong> - Advanced AI assistant with 2TB storage.</p><ul><li>Gemini Pro AI access</li><li>2TB Google Drive storage</li><li>Priority features</li><li>Advanced AI capabilities</li></ul>",
-            "image_url": "https://storage.googleapis.com/takeapp/media/cmkqjr227000204jja3lb0ofg.jpeg",
-            "category_id": "ai-tools",
-            "variations": [
-                {"id": "gemini-1m", "name": "1 Month", "price": 999, "original_price": 1499},
-                {"id": "gemini-3m", "name": "3 Months", "price": 2100, "original_price": 3499},
-                {"id": "gemini-1y", "name": "1 Year", "price": 6999, "original_price": 12000}
-            ],
-            "is_active": True,
-            "is_sold_out": False,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        },
-        {
-            "id": "netflix",
-            "name": "Netflix Premium",
-            "description": "<p><strong>Netflix Premium</strong> - Stream unlimited movies and TV shows.</p><ul><li>4K Ultra HD streaming</li><li>Watch on 4 screens at once</li><li>Ad-free experience</li><li>Download on 6 devices</li></ul>",
-            "image_url": "https://res.cloudinary.com/dh8gunpkd/image/upload/v1768366377/psu57vxfvdv1ivhjxz3b.png",
-            "category_id": "ott",
-            "variations": [
-                {"id": "netflix-shared", "name": "Shared (1 Week)", "price": 99, "original_price": 149},
-                {"id": "netflix-private", "name": "Private Profile (1 Month)", "price": 449, "original_price": 699},
-                {"id": "netflix-3m", "name": "3 Months", "price": 1199, "original_price": 1799}
-            ],
-            "is_active": True,
-            "is_sold_out": False,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        },
-        {
-            "id": "pubg",
-            "name": "PUBG UC",
-            "description": "<p><strong>PUBG Mobile UC</strong> - Get Unknown Cash for PUBG Mobile.</p><ul><li>Instant delivery</li><li>Safe and secure</li><li>Works worldwide</li><li>24/7 support</li></ul>",
-            "image_url": "https://storage.googleapis.com/takeapp/media/cmgrso8xd000f04l1d0rt5jgv.png",
-            "category_id": "topups",
-            "variations": [
-                {"id": "pubg-60", "name": "60 UC", "price": 140},
-                {"id": "pubg-325", "name": "325 UC", "price": 560},
-                {"id": "pubg-660", "name": "660 UC", "price": 1100},
-                {"id": "pubg-1800", "name": "1800 UC", "price": 2800}
-            ],
-            "is_active": True,
-            "is_sold_out": False,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        },
-        {
-            "id": "valorant",
-            "name": "Valorant Points",
-            "description": "<p><strong>Valorant Points (VP)</strong> - Purchase skins and battle pass.</p><ul><li>Instant delivery</li><li>All regions supported</li><li>Safe transaction</li></ul>",
-            "image_url": "https://storage.googleapis.com/takeapp/media/cmhnfx7xw000f04kyaho6gfyc.jpeg",
-            "category_id": "topups",
-            "variations": [
-                {"id": "vp-475", "name": "475 VP", "price": 560},
-                {"id": "vp-1000", "name": "1000 VP", "price": 1100},
-                {"id": "vp-2050", "name": "2050 VP", "price": 2100}
-            ],
-            "is_active": True,
-            "is_sold_out": False,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        },
-        {
-            "id": "steam-card",
-            "name": "Steam Gift Card (USD)",
-            "description": "<p><strong>Steam Wallet Gift Card</strong> - Add funds to your Steam account.</p><ul><li>Nepal region compatible</li><li>Instant code delivery</li><li>Works for all Steam games</li></ul>",
-            "image_url": "https://storage.googleapis.com/takeapp/media/cmgrrzngz000604l80j45ewkt.png",
-            "category_id": "gaming",
-            "variations": [
-                {"id": "steam-5", "name": "$5 USD", "price": 750},
-                {"id": "steam-10", "name": "$10 USD", "price": 1450},
-                {"id": "steam-20", "name": "$20 USD", "price": 2850},
-                {"id": "steam-50", "name": "$50 USD", "price": 7000}
-            ],
-            "is_active": True,
-            "is_sold_out": False,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        },
-        {
-            "id": "minecraft",
-            "name": "Minecraft Java + Bedrock",
-            "description": "<p><strong>Minecraft Java & Bedrock Edition</strong> - Get both editions in one purchase.</p><ul><li>Lifetime license</li><li>Both Java and Bedrock</li><li>Cross-platform play</li></ul>",
-            "image_url": "https://storage.googleapis.com/takeapp/media/cmgrrxtc4000j04jrgjwj1374.png",
-            "category_id": "gaming",
-            "variations": [
-                {"id": "mc-full", "name": "Full License", "price": 1800, "original_price": 2500}
-            ],
-            "is_active": True,
-            "is_sold_out": False,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        },
-        {
-            "id": "adobe-cc",
-            "name": "Adobe Creative Cloud - All Apps",
-            "description": "<p><strong>Adobe Creative Cloud</strong> - All 20+ Adobe apps included.</p><ul><li>Photoshop, Illustrator, Premiere Pro</li><li>After Effects, InDesign, Lightroom</li><li>100GB cloud storage</li><li>Regular updates</li></ul>",
-            "image_url": "https://storage.googleapis.com/takeapp/media/cmhfsbc59000c04ky6e6x98gl.jpeg",
-            "category_id": "software",
-            "variations": [
-                {"id": "adobe-1m", "name": "1 Month", "price": 1999, "original_price": 2999},
-                {"id": "adobe-1y", "name": "1 Year", "price": 9999, "original_price": 14000}
-            ],
-            "is_active": True,
-            "is_sold_out": False,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        },
-        {
-            "id": "discord-nitro",
-            "name": "Discord Nitro",
-            "description": "<p><strong>Discord Nitro</strong> - Unlock premium Discord features.</p><ul><li>HD video streaming</li><li>Custom emojis everywhere</li><li>2 Server Boosts</li><li>Animated avatar</li></ul>",
-            "image_url": "https://storage.googleapis.com/takeapp/media/cmkqjtwrs000004jocqxodva8.jpeg",
-            "category_id": "software",
-            "variations": [
-                {"id": "nitro-1m", "name": "1 Month", "price": 900, "original_price": 1499},
-                {"id": "nitro-1y", "name": "1 Year", "price": 5999, "original_price": 9999}
-            ],
-            "is_active": True,
-            "is_sold_out": False,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        },
-        {
-            "id": "gta5",
-            "name": "Grand Theft Auto 5",
-            "description": "<p><strong>GTA 5</strong> - Experience the epic open world game.</p><ul><li>PC version (Steam/Rockstar)</li><li>Lifetime license</li><li>Online mode included</li></ul>",
-            "image_url": "https://storage.googleapis.com/takeapp/media/cmgrrp0zx001004jr98wkcrb7.jpeg",
-            "category_id": "gaming",
-            "variations": [
-                {"id": "gta5-steam", "name": "Steam Version", "price": 2599, "original_price": 3499}
-            ],
-            "is_active": True,
-            "is_sold_out": False,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        },
-        {
-            "id": "pc-gamepass",
-            "name": "PC Game Pass (Lifetime)",
-            "description": "<p><strong>Xbox PC Game Pass</strong> - Access hundreds of PC games.</p><ul><li>Lifetime access</li><li>Day one releases</li><li>EA Play included</li><li>Cloud gaming</li></ul>",
-            "image_url": "https://storage.googleapis.com/takeapp/media/cmgrrktqv000i04jv7907a4wc.jpeg",
-            "category_id": "gaming",
-            "variations": [
-                {"id": "gamepass-lifetime", "name": "Lifetime Access", "price": 1799, "original_price": 2999}
-            ],
-            "is_active": True,
-            "is_sold_out": False,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        }
-    ]
-    
-    for prod in products_data:
-        await db.products.update_one({"id": prod["id"]}, {"$set": prod}, upsert=True)
-    
-    # Seed reviews
-    reviews_data = [
-        {"id": "rev1", "reviewer_name": "Sujan Thapa", "rating": 5, "comment": "Fast delivery and genuine products. Got my Netflix subscription within minutes!", "review_date": "2025-01-10T10:00:00Z", "created_at": datetime.now(timezone.utc).isoformat()},
-        {"id": "rev2", "reviewer_name": "Anisha Sharma", "rating": 5, "comment": "Best prices in Nepal for digital products. Highly recommended!", "review_date": "2025-01-08T14:30:00Z", "created_at": datetime.now(timezone.utc).isoformat()},
-        {"id": "rev3", "reviewer_name": "Rohan KC", "rating": 5, "comment": "Bought PUBG UC, instant delivery. Will buy again!", "review_date": "2025-01-05T09:15:00Z", "created_at": datetime.now(timezone.utc).isoformat()},
-        {"id": "rev4", "reviewer_name": "Priya Pandey", "rating": 4, "comment": "Great service, customer support helped me set up my account.", "review_date": "2025-01-03T16:45:00Z", "created_at": datetime.now(timezone.utc).isoformat()},
-        {"id": "rev5", "reviewer_name": "Bikash Rai", "rating": 5, "comment": "Trusted seller! Been buying from them for 2 years now.", "review_date": "2024-12-28T11:20:00Z", "created_at": datetime.now(timezone.utc).isoformat()},
-    ]
-    
-    for rev in reviews_data:
-        await db.reviews.update_one({"id": rev["id"]}, {"$set": rev}, upsert=True)
-    
-    # Seed social links
+    # Seed social links only (no products/categories)
     social_data = [
         {"id": "fb", "platform": "Facebook", "url": "https://facebook.com/gameshopnepal", "icon": "facebook"},
         {"id": "ig", "platform": "Instagram", "url": "https://instagram.com/gameshopnepal", "icon": "instagram"},
@@ -557,6 +411,16 @@ async def seed_data():
     
     for link in social_data:
         await db.social_links.update_one({"id": link["id"]}, {"$set": link}, upsert=True)
+    
+    # Seed some reviews
+    reviews_data = [
+        {"id": "rev1", "reviewer_name": "Sujan Thapa", "rating": 5, "comment": "Fast delivery and genuine products. Got my Netflix subscription within minutes!", "review_date": "2025-01-10T10:00:00Z", "created_at": datetime.now(timezone.utc).isoformat()},
+        {"id": "rev2", "reviewer_name": "Anisha Sharma", "rating": 5, "comment": "Best prices in Nepal for digital products. Highly recommended!", "review_date": "2025-01-08T14:30:00Z", "created_at": datetime.now(timezone.utc).isoformat()},
+        {"id": "rev3", "reviewer_name": "Rohan KC", "rating": 5, "comment": "Bought PUBG UC, instant delivery. Will buy again!", "review_date": "2025-01-05T09:15:00Z", "created_at": datetime.now(timezone.utc).isoformat()},
+    ]
+    
+    for rev in reviews_data:
+        await db.reviews.update_one({"id": rev["id"]}, {"$set": rev}, upsert=True)
     
     return {"message": "Data seeded successfully"}
 
