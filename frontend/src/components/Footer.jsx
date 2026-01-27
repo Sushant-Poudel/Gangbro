@@ -33,42 +33,42 @@ export default function Footer() {
 
   return (
     <footer className="bg-black border-t border-white/10" data-testid="footer">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 lg:gap-8">
           {/* Logo & About */}
-          <div className="col-span-1 md:col-span-2">
-            <Link to="/" className="inline-block mb-4">
-              <img src={LOGO_URL} alt="GameShop Nepal" className="h-12 w-auto" />
+          <div className="col-span-2">
+            <Link to="/" className="inline-block mb-3 lg:mb-4">
+              <img src={LOGO_URL} alt="GameShop Nepal" className="h-8 lg:h-12 w-auto" />
             </Link>
-            <p className="text-white/60 text-sm leading-relaxed max-w-md">
+            <p className="text-white/60 text-xs lg:text-sm leading-relaxed max-w-md">
               Your trusted source for digital products in Nepal since 2021. 
-              We provide gaming subscriptions, OTT services, software licenses, and more.
+              Gaming subscriptions, OTT services, software licenses, and more.
             </p>
           </div>
 
           {/* Quick Links */}
           <div>
-            <h3 className="font-heading text-lg font-semibold text-white uppercase tracking-wider mb-4">
+            <h3 className="font-heading text-sm lg:text-lg font-semibold text-white uppercase tracking-wider mb-3 lg:mb-4">
               Quick Links
             </h3>
-            <ul className="space-y-2">
+            <ul className="space-y-1.5 lg:space-y-2">
               <li>
-                <Link to="/" className="text-white/60 hover:text-gold-500 text-sm transition-colors" data-testid="footer-link-home">
+                <Link to="/" className="text-white/60 hover:text-gold-500 text-xs lg:text-sm transition-colors" data-testid="footer-link-home">
                   Home
                 </Link>
               </li>
               <li>
-                <Link to="/about" className="text-white/60 hover:text-gold-500 text-sm transition-colors" data-testid="footer-link-about">
+                <Link to="/about" className="text-white/60 hover:text-gold-500 text-xs lg:text-sm transition-colors" data-testid="footer-link-about">
                   About Us
                 </Link>
               </li>
               <li>
-                <Link to="/contact" className="text-white/60 hover:text-gold-500 text-sm transition-colors" data-testid="footer-link-contact">
+                <Link to="/contact" className="text-white/60 hover:text-gold-500 text-xs lg:text-sm transition-colors" data-testid="footer-link-contact">
                   Contact
                 </Link>
               </li>
               <li>
-                <Link to="/faq" className="text-white/60 hover:text-gold-500 text-sm transition-colors" data-testid="footer-link-faq">
+                <Link to="/faq" className="text-white/60 hover:text-gold-500 text-xs lg:text-sm transition-colors" data-testid="footer-link-faq">
                   FAQ
                 </Link>
               </li>
@@ -77,13 +77,13 @@ export default function Footer() {
 
           {/* Contact & Social */}
           <div>
-            <h3 className="font-heading text-lg font-semibold text-white uppercase tracking-wider mb-4">
-              Connect With Us
+            <h3 className="font-heading text-sm lg:text-lg font-semibold text-white uppercase tracking-wider mb-3 lg:mb-4">
+              Connect
             </h3>
-            <p className="text-white/60 text-sm mb-4">
+            <p className="text-white/60 text-xs lg:text-sm mb-3 lg:mb-4 break-all">
               support@gameshopnepal.com
             </p>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3 lg:space-x-4">
               {socialLinks.map((link) => (
                 <a
                   key={link.id}
@@ -101,18 +101,18 @@ export default function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="mt-12 pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between">
-          <p className="text-white/40 text-sm">
+        <div className="mt-8 lg:mt-12 pt-6 lg:pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p className="text-white/40 text-xs lg:text-sm text-center sm:text-left">
             © {new Date().getFullYear()} GameShop Nepal. All rights reserved.
           </p>
           <a
             href="https://www.trustpilot.com/review/gameshopnepal.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-4 md:mt-0 text-gold-500 hover:text-gold-400 text-sm flex items-center"
+            className="text-gold-500 hover:text-gold-400 text-xs lg:text-sm flex items-center"
             data-testid="footer-trustpilot-link"
           >
-            View our reviews on Trustpilot →
+            View reviews on Trustpilot →
           </a>
         </div>
       </div>
