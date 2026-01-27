@@ -11,13 +11,11 @@ const LOGO_URL = "https://customer-assets.emergentagent.com/job_8ec93a6a-4f80-4d
 
 export default function AdminLogin() {
   const navigate = useNavigate();
-  const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    name: ''
+    username: '',
+    password: ''
   });
 
   const handleSubmit = async (e) => {
@@ -25,26 +23,15 @@ export default function AdminLogin() {
     setIsLoading(true);
 
     try {
-      if (isLogin) {
-        const res = await authAPI.login({
-          email: formData.email,
-          password: formData.password
-        });
-        localStorage.setItem('admin_token', res.data.token);
-        toast.success('Login successful!');
-        navigate('/admin');
-      } else {
-        const res = await authAPI.register({
-          email: formData.email,
-          password: formData.password,
-          name: formData.name
-        });
-        localStorage.setItem('admin_token', res.data.token);
-        toast.success('Account created successfully!');
-        navigate('/admin');
-      }
+      const res = await authAPI.login({
+        email: formData.username,
+        password: formData.password
+      });
+      localStorage.setItem('admin_token', res.data.token);
+      toast.success('Login successful!');
+      navigate('/admin');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Authentication failed');
+      toast.error(error.response?.data?.detail || 'Invalid credentials');
     } finally {
       setIsLoading(false);
     }
@@ -66,33 +53,17 @@ export default function AdminLogin() {
         {/* Login Form */}
         <div className="bg-card border border-white/10 rounded-lg p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {!isLogin && (
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-white">Name</Label>
-                <Input
-                  id="name"
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="bg-black border-white/20 text-white"
-                  placeholder="Enter your name"
-                  required={!isLogin}
-                  data-testid="register-name-input"
-                />
-              </div>
-            )}
-
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-white">Email</Label>
+              <Label htmlFor="username" className="text-white">Username</Label>
               <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                id="username"
+                type="text"
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                 className="bg-black border-white/20 text-white"
-                placeholder="admin@example.com"
+                placeholder="Enter username"
                 required
-                data-testid="login-email-input"
+                data-testid="login-username-input"
               />
             </div>
 
@@ -136,21 +107,11 @@ export default function AdminLogin() {
               ) : (
                 <>
                   <Lock className="mr-2 h-4 w-4" />
-                  {isLogin ? 'Sign In' : 'Create Account'}
+                  Sign In
                 </>
               )}
             </Button>
           </form>
-
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-white/60 hover:text-gold-500 text-sm"
-              data-testid="toggle-auth-mode"
-            >
-              {isLogin ? "Don't have an account? Create one" : "Already have an account? Sign in"}
-            </button>
-          </div>
         </div>
 
         {/* Back to Site */}
