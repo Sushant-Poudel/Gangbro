@@ -82,20 +82,20 @@ export default function HomePage() {
         </div>
 
         {/* Reviews Grid */}
-        <div className="py-12 bg-gradient-to-b from-black to-transparent">
+        <div className="py-8 lg:py-12 bg-gradient-to-b from-black to-transparent">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="font-heading text-3xl md:text-4xl font-bold text-white uppercase tracking-tight mb-8 text-center">
+            <h2 className="font-heading text-2xl sm:text-3xl md:text-4xl font-bold text-white uppercase tracking-tight mb-6 lg:mb-8 text-center">
               What Our Customers Say
             </h2>
             
             {isLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-40 skeleton rounded-lg"></div>
+                  <div key={i} className="h-32 lg:h-40 skeleton rounded-lg"></div>
                 ))}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
                 {reviews.slice(0, 6).map((review, index) => (
                   <div key={review.id} className="animate-fadeIn" style={{ animationDelay: `${index * 100}ms` }}>
                     <ReviewCard review={review} />
@@ -108,34 +108,34 @@ export default function HomePage() {
       </section>
 
       {/* Trust Badges */}
-      <section className="py-12 border-y border-white/10" data-testid="trust-badges">
+      <section className="py-8 lg:py-12 border-y border-white/10" data-testid="trust-badges">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="flex items-center gap-4 justify-center md:justify-start">
-              <div className="p-3 rounded-lg bg-gold-500/10">
-                <Clock className="h-6 w-6 text-gold-500" />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 lg:gap-8">
+            <div className="flex items-center gap-3 lg:gap-4 justify-center sm:justify-start">
+              <div className="p-2 lg:p-3 rounded-lg bg-gold-500/10">
+                <Clock className="h-5 w-5 lg:h-6 lg:w-6 text-gold-500" />
               </div>
               <div>
-                <h3 className="font-heading font-semibold text-white uppercase">Instant Delivery</h3>
-                <p className="text-white/60 text-sm">Products delivered in minutes</p>
+                <h3 className="font-heading font-semibold text-white uppercase text-sm lg:text-base">Instant Delivery</h3>
+                <p className="text-white/60 text-xs lg:text-sm">Products delivered in minutes</p>
               </div>
             </div>
-            <div className="flex items-center gap-4 justify-center">
-              <div className="p-3 rounded-lg bg-gold-500/10">
-                <Shield className="h-6 w-6 text-gold-500" />
+            <div className="flex items-center gap-3 lg:gap-4 justify-center">
+              <div className="p-2 lg:p-3 rounded-lg bg-gold-500/10">
+                <Shield className="h-5 w-5 lg:h-6 lg:w-6 text-gold-500" />
               </div>
               <div>
-                <h3 className="font-heading font-semibold text-white uppercase">100% Safe</h3>
-                <p className="text-white/60 text-sm">Secure transactions guaranteed</p>
+                <h3 className="font-heading font-semibold text-white uppercase text-sm lg:text-base">100% Safe</h3>
+                <p className="text-white/60 text-xs lg:text-sm">Secure transactions guaranteed</p>
               </div>
             </div>
-            <div className="flex items-center gap-4 justify-center md:justify-end">
-              <div className="p-3 rounded-lg bg-gold-500/10">
-                <Headphones className="h-6 w-6 text-gold-500" />
+            <div className="flex items-center gap-3 lg:gap-4 justify-center sm:justify-end">
+              <div className="p-2 lg:p-3 rounded-lg bg-gold-500/10">
+                <Headphones className="h-5 w-5 lg:h-6 lg:w-6 text-gold-500" />
               </div>
               <div>
-                <h3 className="font-heading font-semibold text-white uppercase">24/7 Support</h3>
-                <p className="text-white/60 text-sm">Always here to help</p>
+                <h3 className="font-heading font-semibold text-white uppercase text-sm lg:text-base">24/7 Support</h3>
+                <p className="text-white/60 text-xs lg:text-sm">Always here to help</p>
               </div>
             </div>
           </div>
@@ -143,11 +143,11 @@ export default function HomePage() {
       </section>
 
       {/* Products Section */}
-      <section className="py-16" data-testid="products-section">
+      <section className="py-10 lg:py-16" data-testid="products-section">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Section Header */}
-          <div className="text-center mb-12">
-            <h2 className="font-heading text-4xl md:text-5xl font-bold text-white uppercase tracking-tight mb-4">
+          <div className="text-center mb-8 lg:mb-12">
+            <h2 className="font-heading text-3xl sm:text-4xl md:text-5xl font-bold text-white uppercase tracking-tight mb-3 lg:mb-4">
               Our <span className="text-gold-500">Products</span>
             </h2>
             <p className="text-white/60 max-w-2xl mx-auto">
