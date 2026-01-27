@@ -150,30 +150,30 @@ export default function HomePage() {
             <h2 className="font-heading text-3xl sm:text-4xl md:text-5xl font-bold text-white uppercase tracking-tight mb-3 lg:mb-4">
               Our <span className="text-gold-500">Products</span>
             </h2>
-            <p className="text-white/60 max-w-2xl mx-auto">
+            <p className="text-white/60 max-w-2xl mx-auto text-sm lg:text-base">
               Browse our collection of premium digital products - gaming subscriptions, OTT services, software licenses, and more.
             </p>
           </div>
 
           {/* Category Filter */}
-          <div className="flex flex-wrap items-center justify-center gap-3 mb-12">
+          <div className="flex flex-wrap items-center justify-center gap-2 lg:gap-3 mb-8 lg:mb-12">
             <button
               onClick={() => setSelectedCategory(null)}
               data-testid="category-all"
-              className={`category-pill px-4 py-2 rounded-full border text-sm font-heading uppercase tracking-wider transition-all ${
+              className={`category-pill px-3 lg:px-4 py-1.5 lg:py-2 rounded-full border text-xs lg:text-sm font-heading uppercase tracking-wider transition-all ${
                 selectedCategory === null
                   ? 'bg-gold-500/20 border-gold-500 text-gold-500'
                   : 'border-white/20 text-white/60 hover:border-gold-500/50 hover:text-gold-500'
               }`}
             >
-              All Products
+              All
             </button>
             {categories.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
                 data-testid={`category-${cat.slug}`}
-                className={`category-pill px-4 py-2 rounded-full border text-sm font-heading uppercase tracking-wider transition-all ${
+                className={`category-pill px-3 lg:px-4 py-1.5 lg:py-2 rounded-full border text-xs lg:text-sm font-heading uppercase tracking-wider transition-all ${
                   selectedCategory === cat.id
                     ? 'bg-gold-500/20 border-gold-500 text-gold-500'
                     : 'border-white/20 text-white/60 hover:border-gold-500/50 hover:text-gold-500'
@@ -186,13 +186,13 @@ export default function HomePage() {
 
           {/* Products Grid */}
           {isLoading ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 lg:gap-6">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
                 <div key={i} className="aspect-square skeleton rounded-lg"></div>
               ))}
             </div>
           ) : filteredProducts.length > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 lg:gap-6">
               {filteredProducts.map((product, index) => (
                 <div key={product.id} className="animate-fadeIn" style={{ animationDelay: `${index * 50}ms` }}>
                   <ProductCard product={product} />
