@@ -13,6 +13,7 @@ const navItems = [
   { path: '/admin/faqs', label: 'FAQs', icon: HelpCircle },
   { path: '/admin/pages', label: 'Pages', icon: FileText },
   { path: '/admin/social-links', label: 'Social Links', icon: Share2 },
+  { path: '/admin/takeapp', label: 'Take.app', icon: Store },
 ];
 
 export default function AdminLayout({ children, title }) {
