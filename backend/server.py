@@ -398,7 +398,7 @@ async def delete_faq(faq_id: str, current_user: dict = Depends(get_current_user)
     return {"message": "FAQ deleted"}
 
 @api_router.put("/faqs/reorder")
-async def reorder_faqs(faq_ids: List[str] = fastapi.Body(...), current_user: dict = Depends(get_current_user)):
+async def reorder_faqs(faq_ids: List[str] = Body(..., embed=False), current_user: dict = Depends(get_current_user)):
     for index, faq_id in enumerate(faq_ids):
         await db.faqs.update_one({"id": faq_id}, {"$set": {"sort_order": index}})
     return {"message": "FAQs reordered successfully"}
