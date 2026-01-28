@@ -600,6 +600,101 @@ async def update_takeapp_inventory(item_id: str, quantity: int = Body(..., embed
             raise HTTPException(status_code=response.status_code, detail="Failed to update inventory")
         return {"message": "Inventory updated", "item_id": item_id, "quantity": quantity}
 
+# Order creation models
+class OrderItem(BaseModel):
+    name: str
+    price: int  # in paisa (1 rupee = 100 paisa)
+    quantity: int = 1
+    variation: Optional[str] = None
+
+class CreateOrderRequest(BaseModel):
+    customer_name: str
+    customer_phone: str
+    customer_email: Optional[str] = None
+    items: List[OrderItem]
+    total_amount: int  # in paisa
+    remark: Optional[str] = None
+
+@api_router.post("/orders/create")
+async def create_order(order_data: CreateOrderRequest):
+    """Create an order - saves locally and syncs to Take.app"""
+    
+    # Generate order ID
+    order_id = str(uuid.uuid4())
+    
+    # Build remark with item details
+    items_text = ", ".join([f"{item.quantity}x {item.name}" + (f" ({item.variation})" if item.variation else "") for item in order_data.items])
+    full_remark = f"Items: {items_text}"
+    if order_data.remark:
+        full_remark += f"\nNote: {order_data.remark}"
+    
+    # Save order locally first
+    local_order = {
+        "id": order_id,
+        "customer_name": order_data.customer_name,
+        "customer_phone": order_data.customer_phone,
+        "customer_email": order_data.customer_email,
+        "items": [item.model_dump() for item in order_data.items],
+        "total_amount": order_data.total_amount,
+        "remark": order_data.remark,
+        "status": "pending",
+        "takeapp_synced": False,
+        "takeapp_order_id": None,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.orders.insert_one(local_order)
+    
+    # Try to sync to Take.app
+    takeapp_result = None
+    if TAKEAPP_API_KEY:
+        try:
+            async with httpx.AsyncClient() as client:
+                takeapp_payload = {
+                    "customer_name": order_data.customer_name,
+                    "customer_phone": order_data.customer_phone,
+                    "customer_email": order_data.customer_email,
+                    "total_amount": order_data.total_amount,  # in paisa
+                    "remark": full_remark
+                }
+                
+                response = await client.post(
+                    f"{TAKEAPP_BASE_URL}/orders?api_key={TAKEAPP_API_KEY}",
+                    json=takeapp_payload,
+                    timeout=10.0
+                )
+                
+                if response.status_code in [200, 201]:
+                    takeapp_result = response.json()
+                    # Update local order with Take.app order ID
+                    await db.orders.update_one(
+                        {"id": order_id},
+                        {"$set": {
+                            "takeapp_synced": True,
+                            "takeapp_order_id": takeapp_result.get("id"),
+                            "takeapp_order_number": takeapp_result.get("number")
+                        }}
+                    )
+        except Exception as e:
+            print(f"Failed to sync order to Take.app: {e}")
+    
+    # Get updated order
+    final_order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    
+    return {
+        "success": True,
+        "order_id": order_id,
+        "takeapp_synced": final_order.get("takeapp_synced", False),
+        "takeapp_order_number": final_order.get("takeapp_order_number"),
+        "message": "Order created successfully"
+    }
+
+@api_router.get("/orders")
+async def get_local_orders(current_user: dict = Depends(get_current_user)):
+    """Get all local orders"""
+    orders = await db.orders.find({}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    return orders
+
 @api_router.post("/takeapp/sync-products")
 async def sync_takeapp_products(current_user: dict = Depends(get_current_user)):
     """Sync products from Take.app inventory to local database"""
