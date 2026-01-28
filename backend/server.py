@@ -153,6 +153,9 @@ class FAQItem(BaseModel):
     answer: str
     sort_order: int = 0
 
+class FAQReorderRequest(BaseModel):
+    faq_ids: List[str]
+
 # ==================== HELPERS ====================
 
 def hash_password(password: str) -> str:
