@@ -197,7 +197,21 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="text-center py-12">
-              <p className="text-white/40 text-lg">No products found in this category.</p>
+              <p className="text-white/40 text-lg">
+                {searchQuery 
+                  ? `No products found for "${searchQuery}"`
+                  : 'No products found in this category.'
+                }
+              </p>
+              {searchQuery && (
+                <Button
+                  onClick={clearSearch}
+                  variant="outline"
+                  className="mt-4 border-gold-500 text-gold-500 hover:bg-gold-500 hover:text-black"
+                >
+                  Clear Search
+                </Button>
+              )}
             </div>
           )}
         </div>
