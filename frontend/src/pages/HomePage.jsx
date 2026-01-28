@@ -98,29 +98,40 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Reviews Grid */}
-        <div className="py-8 lg:py-12 bg-gradient-to-b from-black to-transparent">
+        {/* Reviews Marquee */}
+        <div className="py-8 lg:py-12 bg-gradient-to-b from-black to-transparent overflow-hidden">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="font-heading text-2xl sm:text-3xl md:text-4xl font-bold text-white uppercase tracking-tight mb-6 lg:mb-8 text-center">
               What Our Customers Say
             </h2>
-            
-            {isLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-32 lg:h-40 skeleton rounded-lg"></div>
+          </div>
+          
+          {isLoading ? (
+            <div className="flex gap-4 lg:gap-6 px-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-32 lg:h-40 w-72 lg:w-80 skeleton rounded-lg flex-shrink-0"></div>
+              ))}
+            </div>
+          ) : reviews.length > 0 ? (
+            <div className="reviews-marquee-container">
+              <div className="reviews-marquee">
+                {/* First set of reviews */}
+                {reviews.map((review) => (
+                  <div key={review.id} className="review-slide">
+                    <ReviewCard review={review} />
+                  </div>
                 ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-                {reviews.slice(0, 6).map((review, index) => (
-                  <div key={review.id} className="animate-fadeIn" style={{ animationDelay: `${index * 100}ms` }}>
+                {/* Duplicate set for seamless loop */}
+                {reviews.map((review) => (
+                  <div key={`dup-${review.id}`} className="review-slide">
                     <ReviewCard review={review} />
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-white/40">No reviews yet</div>
+          )}
         </div>
       </section>
 
