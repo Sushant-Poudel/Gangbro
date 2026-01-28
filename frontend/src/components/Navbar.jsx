@@ -27,6 +27,13 @@ export default function Navbar() {
       setIsSearchOpen(false);
       setSearchQuery('');
       setIsMenuOpen(false);
+      // Scroll to products section after a short delay
+      setTimeout(() => {
+        const productsSection = document.querySelector('[data-testid="products-section"]');
+        if (productsSection) {
+          productsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
     }
   };
 
