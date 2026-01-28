@@ -38,6 +38,7 @@ function App() {
           <Route path="/admin/faqs" element={<ProtectedRoute><AdminFAQs /></ProtectedRoute>} />
           <Route path="/admin/pages" element={<ProtectedRoute><AdminPages /></ProtectedRoute>} />
           <Route path="/admin/social-links" element={<ProtectedRoute><AdminSocialLinks /></ProtectedRoute>} />
+          <Route path="/admin/takeapp" element={<ProtectedRoute><AdminTakeApp /></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>
       <Toaster position="top-right" richColors />
