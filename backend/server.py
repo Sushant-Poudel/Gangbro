@@ -509,6 +509,197 @@ async def seed_data():
     
     return {"message": "Data seeded successfully"}
 
+# ==================== TAKE.APP INTEGRATION ====================
+
+TAKEAPP_API_KEY = os.environ.get("TAKEAPP_API_KEY", "")
+TAKEAPP_BASE_URL = "https://take.app/api/platform"
+
+class TakeAppOrder(BaseModel):
+    id: str
+    number: int
+    status: str
+    paymentStatus: str
+    fulfillmentStatus: str
+    customerName: str
+    customerPhone: str
+    customerEmail: Optional[str] = None
+    totalAmount: int
+    totalItemsQuantity: int
+    items: List[dict] = []
+    createdAt: str
+    updatedAt: str
+
+class TakeAppInventoryItem(BaseModel):
+    item_id: str
+    item_name: str
+    quantity: int
+    price: int
+    original_price: Optional[int] = None
+
+class TakeAppSyncResult(BaseModel):
+    synced_count: int
+    message: str
+
+@api_router.get("/takeapp/store")
+async def get_takeapp_store(current_user: dict = Depends(get_current_user)):
+    """Get Take.app store information"""
+    if not TAKEAPP_API_KEY:
+        raise HTTPException(status_code=400, detail="Take.app API key not configured")
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{TAKEAPP_BASE_URL}/me?api_key={TAKEAPP_API_KEY}")
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail="Failed to fetch store info")
+        return response.json()
+
+@api_router.get("/takeapp/orders")
+async def get_takeapp_orders(current_user: dict = Depends(get_current_user)):
+    """Get orders from Take.app"""
+    if not TAKEAPP_API_KEY:
+        raise HTTPException(status_code=400, detail="Take.app API key not configured")
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{TAKEAPP_BASE_URL}/orders?api_key={TAKEAPP_API_KEY}")
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail="Failed to fetch orders")
+        
+        orders = response.json()
+        # Store orders in local DB for tracking
+        for order in orders:
+            await db.takeapp_orders.update_one(
+                {"id": order["id"]},
+                {"$set": order},
+                upsert=True
+            )
+        return orders
+
+@api_router.get("/takeapp/inventory")
+async def get_takeapp_inventory(current_user: dict = Depends(get_current_user)):
+    """Get inventory from Take.app"""
+    if not TAKEAPP_API_KEY:
+        raise HTTPException(status_code=400, detail="Take.app API key not configured")
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{TAKEAPP_BASE_URL}/inventory?api_key={TAKEAPP_API_KEY}")
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail="Failed to fetch inventory")
+        return response.json()
+
+@api_router.put("/takeapp/inventory/{item_id}")
+async def update_takeapp_inventory(item_id: str, quantity: int = Body(..., embed=True), current_user: dict = Depends(get_current_user)):
+    """Update inventory quantity on Take.app"""
+    if not TAKEAPP_API_KEY:
+        raise HTTPException(status_code=400, detail="Take.app API key not configured")
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.put(
+            f"{TAKEAPP_BASE_URL}/inventory/{item_id}?api_key={TAKEAPP_API_KEY}",
+            json={"quantity": quantity}
+        )
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail="Failed to update inventory")
+        return {"message": "Inventory updated", "item_id": item_id, "quantity": quantity}
+
+@api_router.post("/takeapp/sync-products")
+async def sync_takeapp_products(current_user: dict = Depends(get_current_user)):
+    """Sync products from Take.app inventory to local database"""
+    if not TAKEAPP_API_KEY:
+        raise HTTPException(status_code=400, detail="Take.app API key not configured")
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{TAKEAPP_BASE_URL}/inventory?api_key={TAKEAPP_API_KEY}")
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail="Failed to fetch inventory")
+        
+        inventory = response.json()
+        synced = 0
+        
+        for item in inventory:
+            # Check if product already exists by Take.app ID
+            existing = await db.products.find_one({"takeapp_id": item["item_id"]})
+            
+            if not existing:
+                # Create new product from Take.app item
+                # Get existing category or create a default one
+                default_cat = await db.categories.find_one({"slug": "takeapp-imports"})
+                if not default_cat:
+                    default_cat = {
+                        "id": str(uuid.uuid4()),
+                        "name": "Take.app Imports",
+                        "slug": "takeapp-imports",
+                        "image_url": ""
+                    }
+                    await db.categories.insert_one(default_cat)
+                
+                # Get max sort_order
+                max_order = await db.products.find_one(sort=[("sort_order", -1)])
+                next_order = (max_order.get("sort_order", 0) + 1) if max_order else 0
+                
+                new_product = {
+                    "id": str(uuid.uuid4()),
+                    "takeapp_id": item["item_id"],
+                    "name": item["item_name"],
+                    "slug": item["item_name"].lower().replace(" ", "-"),
+                    "description": f"<p>Imported from Take.app</p>",
+                    "image_url": "",
+                    "category_id": default_cat["id"],
+                    "variations": [{
+                        "id": f"var-{uuid.uuid4()}",
+                        "name": "Default",
+                        "price": item["price"] / 100,  # Convert from paisa to rupees
+                        "original_price": item.get("original_price", item["price"]) / 100 if item.get("original_price") else None
+                    }],
+                    "tags": ["Take.app"],
+                    "sort_order": next_order,
+                    "is_active": True,
+                    "is_sold_out": item["quantity"] == 0,
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }
+                await db.products.insert_one(new_product)
+                synced += 1
+            else:
+                # Update existing product's sold out status based on inventory
+                await db.products.update_one(
+                    {"takeapp_id": item["item_id"]},
+                    {"$set": {"is_sold_out": item["quantity"] == 0}}
+                )
+        
+        return {"synced_count": synced, "message": f"Synced {synced} new products from Take.app"}
+
+@api_router.get("/takeapp/orders/stats")
+async def get_takeapp_order_stats(current_user: dict = Depends(get_current_user)):
+    """Get order statistics from Take.app"""
+    if not TAKEAPP_API_KEY:
+        raise HTTPException(status_code=400, detail="Take.app API key not configured")
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{TAKEAPP_BASE_URL}/orders?api_key={TAKEAPP_API_KEY}")
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail="Failed to fetch orders")
+        
+        orders = response.json()
+        
+        # Calculate statistics
+        total_orders = len(orders)
+        pending_orders = len([o for o in orders if o["status"] == "ORDER_STATUS_PENDING"])
+        completed_orders = len([o for o in orders if o["status"] == "ORDER_STATUS_COMPLETED"])
+        cancelled_orders = len([o for o in orders if o["status"] == "ORDER_STATUS_CANCELLED"])
+        
+        total_revenue = sum(o["totalAmount"] for o in orders if o["status"] == "ORDER_STATUS_COMPLETED") / 100
+        
+        # Get orders from last 24 hours
+        now = datetime.now(timezone.utc)
+        recent_orders = [o for o in orders if datetime.fromisoformat(o["createdAt"].replace("Z", "+00:00")) > now - timedelta(hours=24)]
+        
+        return {
+            "total_orders": total_orders,
+            "pending_orders": pending_orders,
+            "completed_orders": completed_orders,
+            "cancelled_orders": cancelled_orders,
+            "total_revenue": total_revenue,
+            "orders_last_24h": len(recent_orders)
+        }
+
 # ==================== ROOT ====================
 
 @api_router.get("/")
