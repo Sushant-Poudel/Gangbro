@@ -1,45 +1,45 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { pagesAPI } from '@/lib/api';
+import { faqsAPI } from '@/lib/api';
 
 const defaultFAQs = [
   {
+    id: 'default-1',
     question: "How do I place an order?",
     answer: "Simply browse our products, select the plan you want, and click 'Order Now'. This will redirect you to WhatsApp where you can complete your order with our support team."
   },
   {
+    id: 'default-2',
     question: "How long does delivery take?",
     answer: "Most products are delivered instantly within minutes after payment confirmation. Some products may take up to 24 hours depending on availability."
   },
   {
+    id: 'default-3',
     question: "What payment methods do you accept?",
     answer: "We accept eSewa, Khalti, bank transfer, and other local payment methods. Payment details will be shared via WhatsApp when you place an order."
   },
   {
+    id: 'default-4',
     question: "Are your products genuine?",
     answer: "Yes! All our products are 100% genuine and sourced directly from authorized channels. We have been operating since 2021 with thousands of satisfied customers."
-  },
-  {
-    question: "What if I face any issues with my purchase?",
-    answer: "Contact us immediately via WhatsApp or email at support@gameshopnepal.com. Our support team is available 24/7 to assist you."
-  },
-  {
-    question: "Can I get a refund?",
-    answer: "We offer refunds for products that cannot be delivered or are not as described. Contact our support team for refund requests within 24 hours of purchase."
   }
 ];
 
 export default function FAQPage() {
-  const [pageData, setPageData] = useState({ title: 'FAQ', content: '' });
+  const [faqs, setFaqs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    pagesAPI.get('faq')
-      .then(res => setPageData(res.data))
-      .catch(() => {})
+    faqsAPI.getAll()
+      .then(res => {
+        // Use API FAQs if available, otherwise use defaults
+        setFaqs(res.data.length > 0 ? res.data : defaultFAQs);
+      })
+      .catch(() => {
+        setFaqs(defaultFAQs);
+      })
       .finally(() => setIsLoading(false));
   }, []);
 
@@ -57,29 +57,22 @@ export default function FAQPage() {
           ) : (
             <>
               <h1 className="font-heading text-4xl md:text-5xl font-bold text-white uppercase tracking-tight mb-4">
-                {pageData.title}
+                FAQ
               </h1>
               <p className="text-white/60 mb-12">
                 Find answers to commonly asked questions about our products and services.
               </p>
 
-              {pageData.content ? (
-                <div 
-                  className="rich-text-content text-white/80 leading-relaxed mb-12"
-                  dangerouslySetInnerHTML={{ __html: pageData.content }}
-                />
-              ) : null}
-
               {/* FAQ Accordion */}
               <Accordion type="single" collapsible className="space-y-4">
-                {defaultFAQs.map((faq, index) => (
+                {faqs.map((faq, index) => (
                   <AccordionItem 
-                    key={index} 
+                    key={faq.id} 
                     value={`item-${index}`}
                     className="bg-card border border-white/10 rounded-lg px-6 data-[state=open]:border-gold-500/50"
                     data-testid={`faq-item-${index}`}
                   >
-                    <AccordionTrigger className="font-heading text-lg font-semibold text-white hover:text-gold-500 py-4">
+                    <AccordionTrigger className="font-heading text-lg font-semibold text-white hover:text-gold-500 py-4 text-left">
                       {faq.question}
                     </AccordionTrigger>
                     <AccordionContent className="text-white/70 pb-4 leading-relaxed">
