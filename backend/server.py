@@ -16,6 +16,7 @@ import hashlib
 import jwt
 import secrets
 import shutil
+import httpx
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
