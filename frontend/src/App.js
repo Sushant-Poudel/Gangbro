@@ -13,6 +13,7 @@ import AdminReviews from "@/pages/admin/AdminReviews";
 import AdminFAQs from "@/pages/admin/AdminFAQs";
 import AdminPages from "@/pages/admin/AdminPages";
 import AdminSocialLinks from "@/pages/admin/AdminSocialLinks";
+import AdminTakeApp from "@/pages/admin/AdminTakeApp";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import "@/App.css";
 
