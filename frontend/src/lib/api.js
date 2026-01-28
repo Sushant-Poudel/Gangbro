@@ -69,6 +69,15 @@ export const reviewsAPI = {
   delete: (id) => api.delete(`/reviews/${id}`),
 };
 
+// FAQ API
+export const faqsAPI = {
+  getAll: () => api.get('/faqs'),
+  create: (data) => api.post('/faqs', data),
+  update: (id, data) => api.put(`/faqs/${id}`, data),
+  delete: (id) => api.delete(`/faqs/${id}`),
+  reorder: (faqIds) => api.put('/faqs/reorder', faqIds),
+};
+
 // Pages API
 export const pagesAPI = {
   get: (pageKey) => api.get(`/pages/${pageKey}`),
