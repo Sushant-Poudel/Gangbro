@@ -10,12 +10,14 @@ import { Badge } from '@/components/ui/badge';
 import { productsAPI } from '@/lib/api';
 
 const WHATSAPP_NUMBER = "9779743488871";
+const DESCRIPTION_CHAR_LIMIT = 200;
 
 export default function ProductPage() {
   const { productId } = useParams();
   const [product, setProduct] = useState(null);
   const [selectedVariation, setSelectedVariation] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -122,10 +124,32 @@ export default function ProductPage() {
 
               {/* Description */}
               <div className="prose prose-invert max-w-none">
-                <div 
-                  className="rich-text-content text-white/80 leading-relaxed text-sm lg:text-base"
-                  dangerouslySetInnerHTML={{ __html: product.description }}
-                />
+                {(() => {
+                  const plainText = product.description?.replace(/<[^>]*>/g, '') || '';
+                  const shouldTruncate = plainText.length > DESCRIPTION_CHAR_LIMIT && !isDescriptionExpanded;
+                  
+                  return (
+                    <>
+                      <div 
+                        className="rich-text-content text-white/80 leading-relaxed text-sm lg:text-base"
+                        dangerouslySetInnerHTML={{ 
+                          __html: shouldTruncate 
+                            ? product.description.substring(0, DESCRIPTION_CHAR_LIMIT) + '...'
+                            : product.description 
+                        }}
+                      />
+                      {plainText.length > DESCRIPTION_CHAR_LIMIT && (
+                        <button
+                          onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                          className="text-gold-500 hover:text-gold-400 text-sm font-medium mt-2 transition-colors"
+                          data-testid="description-toggle"
+                        >
+                          {isDescriptionExpanded ? 'See less' : 'See more...'}
+                        </button>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
               {/* Variations */}
