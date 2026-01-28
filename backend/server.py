@@ -383,6 +383,13 @@ async def create_faq(faq_data: FAQItemCreate, current_user: dict = Depends(get_c
     await db.faqs.insert_one(faq.model_dump())
     return faq
 
+@api_router.put("/faqs/reorder")
+async def reorder_faqs(request: Request, current_user: dict = Depends(get_current_user)):
+    faq_ids = await request.json()
+    for index, faq_id in enumerate(faq_ids):
+        await db.faqs.update_one({"id": faq_id}, {"$set": {"sort_order": index}})
+    return {"message": "FAQs reordered successfully"}
+
 @api_router.put("/faqs/{faq_id}", response_model=FAQItem)
 async def update_faq(faq_id: str, faq_data: FAQItemCreate, current_user: dict = Depends(get_current_user)):
     existing = await db.faqs.find_one({"id": faq_id})
@@ -399,13 +406,6 @@ async def delete_faq(faq_id: str, current_user: dict = Depends(get_current_user)
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="FAQ not found")
     return {"message": "FAQ deleted"}
-
-@api_router.put("/faqs/reorder")
-async def reorder_faqs(request: Request, current_user: dict = Depends(get_current_user)):
-    faq_ids = await request.json()
-    for index, faq_id in enumerate(faq_ids):
-        await db.faqs.update_one({"id": faq_id}, {"$set": {"sort_order": index}})
-    return {"message": "FAQs reordered successfully"}
 
 # ==================== PAGE ROUTES ====================
 
