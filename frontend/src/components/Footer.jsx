@@ -20,15 +20,13 @@ export default function Footer() {
       .catch(() => {});
   }, []);
 
-  const getIcon = (iconName) => {
-    const name = iconName?.toLowerCase();
-    switch (name) {
-      case 'facebook': return <Facebook className="h-5 w-5" />;
-      case 'instagram': return <Instagram className="h-5 w-5" />;
-      case 'whatsapp': return <MessageCircle className="h-5 w-5" />;
-      case 'tiktok': return <TikTokIcon />;
-      default: return null;
-    }
+  const getIcon = (platform) => {
+    const name = platform?.toLowerCase();
+    if (name?.includes('facebook')) return <Facebook className="h-5 w-5" />;
+    if (name?.includes('instagram')) return <Instagram className="h-5 w-5" />;
+    if (name?.includes('whatsapp')) return <MessageCircle className="h-5 w-5" />;
+    if (name?.includes('tiktok')) return <TikTokIcon />;
+    return null;
   };
 
   return (
@@ -63,13 +61,13 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link to="/contact" className="text-white/60 hover:text-gold-500 text-xs lg:text-sm transition-colors" data-testid="footer-link-contact">
-                  Contact
+                <Link to="/faq" className="text-white/60 hover:text-gold-500 text-xs lg:text-sm transition-colors" data-testid="footer-link-faq">
+                  FAQ
                 </Link>
               </li>
               <li>
-                <Link to="/faq" className="text-white/60 hover:text-gold-500 text-xs lg:text-sm transition-colors" data-testid="footer-link-faq">
-                  FAQ
+                <Link to="/terms" className="text-white/60 hover:text-gold-500 text-xs lg:text-sm transition-colors" data-testid="footer-link-terms">
+                  Terms & Conditions
                 </Link>
               </li>
             </ul>
@@ -93,7 +91,7 @@ export default function Footer() {
                   className="text-white/60 hover:text-gold-500 transition-colors"
                   data-testid={`social-link-${link.platform.toLowerCase()}`}
                 >
-                  {getIcon(link.icon)}
+                  {getIcon(link.platform)}
                 </a>
               ))}
             </div>

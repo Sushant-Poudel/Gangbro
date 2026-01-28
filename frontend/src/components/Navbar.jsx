@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, User } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Menu, X } from 'lucide-react';
 
 const LOGO_URL = "https://customer-assets.emergentagent.com/job_8ec93a6a-4f80-4dde-b760-4bc71482fa44/artifacts/4uqt5osn_Staff.zip%20-%201.png";
 
@@ -12,7 +11,6 @@ export default function Navbar() {
   const navLinks = [
     { href: '/', label: 'Home' },
     { href: '/about', label: 'About' },
-    { href: '/contact', label: 'Contact' },
     { href: '/faq', label: 'FAQ' },
   ];
 
@@ -49,15 +47,8 @@ export default function Navbar() {
             ))}
           </div>
 
-          {/* Admin Link */}
-          <div className="hidden md:flex items-center">
-            <Link to="/admin/login" data-testid="nav-admin-link">
-              <Button variant="ghost" size="sm" className="text-white/60 hover:text-gold-500">
-                <User className="h-4 w-4 mr-2" />
-                Admin
-              </Button>
-            </Link>
-          </div>
+          {/* Spacer to keep layout balanced */}
+          <div className="hidden md:flex items-center w-20"></div>
 
           {/* Mobile Menu Button */}
           <button
@@ -88,14 +79,6 @@ export default function Navbar() {
                   {link.label}
                 </Link>
               ))}
-              <Link 
-                to="/admin/login" 
-                onClick={() => setIsMenuOpen(false)}
-                className="font-heading text-sm uppercase tracking-wider py-2 text-white/60"
-                data-testid="mobile-nav-admin"
-              >
-                Admin
-              </Link>
             </div>
           </div>
         )}

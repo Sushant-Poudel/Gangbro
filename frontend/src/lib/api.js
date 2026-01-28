@@ -51,6 +51,7 @@ export const productsAPI = {
   create: (data) => api.post('/products', data),
   update: (id, data) => api.put(`/products/${id}`, data),
   delete: (id) => api.delete(`/products/${id}`),
+  reorder: (data) => api.put('/products/reorder', data),
 };
 
 // Categories API
