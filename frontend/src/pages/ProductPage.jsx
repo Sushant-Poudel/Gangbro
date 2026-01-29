@@ -65,13 +65,15 @@ export default function ProductPage() {
 
     setIsSubmitting(true);
     try {
-      // Build remark with game account details if provided
+      // Build remark with custom field values
       let fullRemark = '';
-      if (orderForm.user_id) {
-        fullRemark += `User ID: ${orderForm.user_id}\n`;
-      }
-      if (orderForm.server_id) {
-        fullRemark += `Server ID: ${orderForm.server_id}\n`;
+      if (product.custom_fields && product.custom_fields.length > 0) {
+        product.custom_fields.forEach(field => {
+          const value = orderForm.custom_fields[field.id];
+          if (value) {
+            fullRemark += `${field.label}: ${value}\n`;
+          }
+        });
       }
       if (orderForm.remark) {
         fullRemark += `Notes: ${orderForm.remark}`;
