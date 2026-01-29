@@ -192,9 +192,11 @@ export default function HomePage() {
                 View All <ChevronRight className="h-4 w-4" />
               </Link>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory">
               {bestSellers.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <div key={product.id} className="flex-shrink-0 w-[160px] sm:w-[180px] lg:w-[200px] snap-start">
+                  <ProductCard product={product} />
+                </div>
               ))}
             </div>
           </div>

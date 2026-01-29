@@ -34,18 +34,13 @@ export default function ProductCard({ product }) {
         )}
 
         {/* Tags Display */}
-        {!product.is_sold_out && (tags.length > 0 || hasDiscount) && (
+        {!product.is_sold_out && tags.length > 0 && (
           <div className="absolute top-1.5 right-1.5 lg:top-2 lg:right-2 flex flex-col gap-1">
             {tags.map(tag => (
               <Badge key={tag} className="bg-gold-500 text-black text-[10px] lg:text-xs font-semibold px-1.5 lg:px-2">
                 {tag.toUpperCase()}
               </Badge>
             ))}
-            {hasDiscount && !tags.includes('Sale') && (
-              <Badge className="bg-green-600 text-white text-[10px] lg:text-xs font-semibold px-1.5 lg:px-2">
-                SALE
-              </Badge>
-            )}
           </div>
         )}
 
