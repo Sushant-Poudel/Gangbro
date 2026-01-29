@@ -80,6 +80,7 @@ export default function AdminProducts() {
         category_id: product.category_id,
         variations: product.variations || [],
         tags: product.tags || [],
+        custom_fields: product.custom_fields || [],
         sort_order: product.sort_order || 0,
         is_active: product.is_active,
         is_sold_out: product.is_sold_out
