@@ -126,6 +126,29 @@ export default function AdminProducts() {
     }
   };
 
+  const handleAddCustomField = () => {
+    if (!newCustomField.label) {
+      toast.error('Field label is required');
+      return;
+    }
+    const field = {
+      ...newCustomField,
+      id: `field-${Date.now()}`
+    };
+    setFormData({
+      ...formData,
+      custom_fields: [...formData.custom_fields, field]
+    });
+    setNewCustomField(emptyCustomField);
+  };
+
+  const handleRemoveCustomField = (fieldId) => {
+    setFormData({
+      ...formData,
+      custom_fields: formData.custom_fields.filter(f => f.id !== fieldId)
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
