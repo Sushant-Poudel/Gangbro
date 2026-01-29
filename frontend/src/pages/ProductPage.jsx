@@ -66,6 +66,18 @@ export default function ProductPage() {
 
     setIsSubmitting(true);
     try {
+      // Build remark with game account details if provided
+      let fullRemark = '';
+      if (orderForm.user_id) {
+        fullRemark += `User ID: ${orderForm.user_id}\n`;
+      }
+      if (orderForm.server_id) {
+        fullRemark += `Server ID: ${orderForm.server_id}\n`;
+      }
+      if (orderForm.remark) {
+        fullRemark += `Notes: ${orderForm.remark}`;
+      }
+
       const orderPayload = {
         customer_name: orderForm.customer_name,
         customer_phone: orderForm.customer_phone,
@@ -77,7 +89,7 @@ export default function ProductPage() {
           variation: currentVariation.name
         }],
         total_amount: currentVariation.price, // Price in rupees
-        remark: orderForm.remark || null
+        remark: fullRemark.trim() || null
       };
 
       const res = await ordersAPI.create(orderPayload);
