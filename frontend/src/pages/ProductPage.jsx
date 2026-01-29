@@ -388,31 +388,31 @@ export default function ProductPage() {
                   />
                 </div>
 
-                {/* Game Account Details */}
-                <div className="pt-2 border-t border-white/10">
-                  <p className="text-white/60 text-xs mb-3">Game Account Details (if applicable)</p>
-                  <div className="space-y-3">
-                    <div>
-                      <Label className="text-white/80 text-sm">Enter your User ID :</Label>
-                      <Input
-                        value={orderForm.user_id}
-                        onChange={(e) => setOrderForm({...orderForm, user_id: e.target.value})}
-                        className="bg-black border-white/20 mt-1 text-base"
-                        placeholder="Your game User ID"
-                      />
-                    </div>
-
-                    <div>
-                      <Label className="text-white/80 text-sm">Enter your Server ID :</Label>
-                      <Input
-                        value={orderForm.server_id}
-                        onChange={(e) => setOrderForm({...orderForm, server_id: e.target.value})}
-                        className="bg-black border-white/20 mt-1 text-base"
-                        placeholder="Your game Server ID"
-                      />
-                    </div>
+                {/* Dynamic Custom Fields from Product */}
+                {product.custom_fields && product.custom_fields.length > 0 && (
+                  <div className="pt-2 border-t border-white/10 space-y-3">
+                    {product.custom_fields.map((field) => (
+                      <div key={field.id}>
+                        <Label className="text-white/80 text-sm">
+                          {field.label} {field.required && '*'}
+                        </Label>
+                        <Input
+                          value={orderForm.custom_fields[field.id] || ''}
+                          onChange={(e) => setOrderForm({
+                            ...orderForm,
+                            custom_fields: {
+                              ...orderForm.custom_fields,
+                              [field.id]: e.target.value
+                            }
+                          })}
+                          className="bg-black border-white/20 mt-1 text-base"
+                          placeholder={field.placeholder}
+                          required={field.required}
+                        />
+                      </div>
+                    ))}
                   </div>
-                </div>
+                )}
 
                 <div>
                   <Label className="text-white/80 text-sm">Notes (optional)</Label>
