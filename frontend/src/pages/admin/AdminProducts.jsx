@@ -478,6 +478,63 @@ export default function AdminProducts() {
                 </div>
               </div>
 
+              {/* Custom Order Form Fields */}
+              <div className="space-y-3">
+                <Label>Custom Order Form Fields</Label>
+                <p className="text-white/40 text-xs">Add custom fields that customers fill when ordering (e.g., User ID, Server ID)</p>
+                
+                {formData.custom_fields.length > 0 && (
+                  <div className="space-y-2">
+                    {formData.custom_fields.map((f) => (
+                      <div key={f.id} className="flex items-center gap-2 bg-black p-2 rounded-lg text-sm">
+                        <span className="flex-1 text-white truncate">{f.label}</span>
+                        {f.required && <span className="text-gold-500 text-xs">Required</span>}
+                        <span className="text-white/40 text-xs hidden sm:inline">{f.placeholder || 'No placeholder'}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveCustomField(f.id)}
+                          className="text-red-400 hover:text-red-300 p-1"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-2">
+                  <Input
+                    value={newCustomField.label}
+                    onChange={(e) => setNewCustomField({ ...newCustomField, label: e.target.value })}
+                    placeholder="Field label (e.g., User ID)"
+                    className="bg-black border-white/20 lg:col-span-1"
+                  />
+                  <Input
+                    value={newCustomField.placeholder}
+                    onChange={(e) => setNewCustomField({ ...newCustomField, placeholder: e.target.value })}
+                    placeholder="Placeholder text"
+                    className="bg-black border-white/20 lg:col-span-1"
+                  />
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={newCustomField.required}
+                      onCheckedChange={(checked) => setNewCustomField({ ...newCustomField, required: checked })}
+                    />
+                    <span className="text-white/60 text-xs">Required</span>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={handleAddCustomField}
+                    variant="outline"
+                    className="border-gold-500 text-gold-500"
+                  >
+                    Add Field
+                  </Button>
+                </div>
+              </div>
+
               {/* Status Toggles */}
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
