@@ -127,21 +127,14 @@ export default function AdminLayout({ children, title }) {
       {/* Main Content */}
       <main className="lg:ml-64 pt-14 lg:pt-0">
         {/* Header */}
-        <header className="bg-card/50 border-b border-white/10 px-4 lg:px-8 py-4 lg:py-6">
-          <h1 className="font-heading text-xl lg:text-2xl font-bold text-white uppercase tracking-wider">
+        <header className="bg-card/50 border-b border-white/10 px-4 lg:px-8 py-3 lg:py-6">
+          <h1 className="font-heading text-lg lg:text-2xl font-bold text-white uppercase tracking-wider">
             {title}
           </h1>
         </header>
 
-        {/* Notification Bar Info - Mobile friendly */}
-        <div className="px-4 lg:px-8 pt-4">
-          <div className="bg-gold-500/10 border border-gold-500/30 rounded-lg p-3 text-sm text-gold-500 mb-4 lg:hidden">
-            💡 Tip: Use the menu button (☰) to access all admin features
-          </div>
-        </div>
-
         {/* Content */}
-        <div className="p-4 lg:p-8 pt-0 lg:pt-8">
+        <div className="p-4 lg:p-8">
           {children}
         </div>
       </main>
