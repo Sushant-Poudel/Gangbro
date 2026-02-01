@@ -14,7 +14,7 @@ export default function ProductCard({ product }) {
   return (
     <Link
       to={productUrl}
-      className="product-card group relative bg-card rounded-lg overflow-hidden hover:ring-1 hover:ring-gold-500/50 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-gold-500/10"
+      className="product-card group relative bg-card rounded-lg overflow-hidden border border-white/20 transition-all duration-300 hover:scale-[1.02] hover:border-emerald-500 hover:shadow-[0_0_20px_rgba(16,185,129,0.4)]"
       data-testid={`product-card-${product.id}`}
     >
       <div className="aspect-square relative overflow-hidden bg-black">
