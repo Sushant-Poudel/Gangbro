@@ -22,7 +22,6 @@ import AdminBlog from "@/pages/admin/AdminBlog";
 import AdminPromoCodes from "@/pages/admin/AdminPromoCodes";
 import AdminPricingSettings from "@/pages/admin/AdminPricingSettings";
 import AdminTrustpilot from "@/pages/admin/AdminTrustpilot";
-import AdminBundles from "@/pages/admin/AdminBundles";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import "@/App.css";
 
