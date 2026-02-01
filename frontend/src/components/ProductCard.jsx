@@ -14,7 +14,7 @@ export default function ProductCard({ product }) {
   return (
     <Link
       to={productUrl}
-      className="product-card group relative rounded-xl overflow-hidden transition-all duration-300 hover:scale-[1.03] hover:-translate-y-1"
+      className="product-card group block rounded-xl overflow-hidden transition-all duration-300 hover:scale-[1.03] hover:-translate-y-1"
       data-testid={`product-card-${product.id}`}
       style={{
         border: '2px solid rgba(255, 255, 255, 0.15)',
