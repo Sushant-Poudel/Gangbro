@@ -21,6 +21,7 @@ import AdminNotificationBar from "@/pages/admin/AdminNotificationBar";
 import AdminBlog from "@/pages/admin/AdminBlog";
 import AdminPromoCodes from "@/pages/admin/AdminPromoCodes";
 import AdminPricingSettings from "@/pages/admin/AdminPricingSettings";
+import AdminTrustpilot from "@/pages/admin/AdminTrustpilot";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import "@/App.css";
 
