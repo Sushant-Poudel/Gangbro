@@ -150,6 +150,18 @@ export const settingsAPI = {
   update: (data) => api.put('/settings', data),
 };
 
+export const bundlesAPI = {
+  getAll: () => api.get('/bundles'),
+  getAllAdmin: () => api.get('/bundles/all'),
+  create: (data) => api.post('/bundles', data),
+  update: (id, data) => api.put(`/bundles/${id}`, data),
+  delete: (id) => api.delete(`/bundles/${id}`),
+};
+
+export const recentPurchasesAPI = {
+  get: (limit = 10) => api.get(`/recent-purchases?limit=${limit}`),
+};
+
 // Trustpilot invitation utility
 export const sendTrustpilotInvitation = (orderData) => {
   if (typeof window !== 'undefined' && window.tp) {
