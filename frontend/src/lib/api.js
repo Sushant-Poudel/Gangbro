@@ -150,4 +150,26 @@ export const settingsAPI = {
   update: (data) => api.put('/settings', data),
 };
 
+// Trustpilot invitation utility
+export const sendTrustpilotInvitation = (orderData) => {
+  if (typeof window !== 'undefined' && window.tp) {
+    const invitation = {
+      recipientEmail: orderData.email,
+      recipientName: orderData.name,
+      referenceId: orderData.orderId,
+      source: 'InvitationScript',
+      productSkus: orderData.products?.map(p => p.sku) || [orderData.orderId],
+      products: orderData.products || [{
+        sku: orderData.orderId,
+        productUrl: `${window.location.origin}/product/${orderData.productSlug}`,
+        imageUrl: orderData.productImage,
+        name: orderData.productName,
+      }],
+    };
+    window.tp('createInvitation', invitation);
+    return true;
+  }
+  return false;
+};
+
 export default api;
