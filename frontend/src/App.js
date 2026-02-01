@@ -53,7 +53,6 @@ function App() {
           <Route path="/admin/promo-codes" element={<ProtectedRoute><AdminPromoCodes /></ProtectedRoute>} />
           <Route path="/admin/pricing" element={<ProtectedRoute><AdminPricingSettings /></ProtectedRoute>} />
           <Route path="/admin/trustpilot" element={<ProtectedRoute><AdminTrustpilot /></ProtectedRoute>} />
-          <Route path="/admin/bundles" element={<ProtectedRoute><AdminBundles /></ProtectedRoute>} />
         </Routes>
       </BrowserRouter>
       <Toaster position="top-right" richColors />
