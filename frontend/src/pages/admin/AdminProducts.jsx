@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, X, ChevronUp, ChevronDown, Image } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, ChevronUp, ChevronDown, Image, GripVertical, Check } from 'lucide-react';
 import AdminLayout from '@/components/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
