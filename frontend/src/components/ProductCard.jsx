@@ -49,9 +49,9 @@ export default function ProductCard({ product }) {
       </div>
 
       <div className="p-3 lg:p-4 border-t border-white/10">
-        <h3 className="font-heading text-sm lg:text-base font-semibold text-white truncate group-hover:text-green-400 transition-colors">{product.name}</h3>
+        <h3 className="font-heading text-sm lg:text-base font-semibold text-white truncate group-hover:text-gold-500 transition-colors">{product.name}</h3>
         <div className="mt-1.5 flex items-baseline gap-1 lg:gap-2">
-          <span className="text-green-400 font-bold text-base lg:text-lg">Rs {lowestPrice.toLocaleString()}</span>
+          <span className="text-gold-500 font-bold text-base lg:text-lg">Rs {lowestPrice.toLocaleString()}</span>
           {product.variations?.length > 1 && <span className="text-white/40 text-[10px] lg:text-xs">onwards</span>}
         </div>
       </div>
