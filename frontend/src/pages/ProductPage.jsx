@@ -116,6 +116,19 @@ export default function ProductPage() {
       const res = await ordersAPI.create(orderPayload);
       setOrderData({ order_id: res.data.order_id, takeapp_order_id: res.data.takeapp_order_id, payment_url: res.data.payment_url });
       setOrderStep('payment');
+      
+      // Send Trustpilot invitation if email was provided
+      if (orderForm.customer_email) {
+        sendTrustpilotInvitation({
+          email: orderForm.customer_email,
+          name: orderForm.customer_name,
+          orderId: res.data.takeapp_order_id || res.data.order_id,
+          productSlug: product.slug || product.id,
+          productImage: product.image_url,
+          productName: `${product.name} - ${currentVariation.name}`,
+        });
+      }
+      
       if (!res.data.payment_url) toast.warning('Order created but payment link not available. Please contact support.');
     } catch (error) {
       console.error('Order error:', error);
