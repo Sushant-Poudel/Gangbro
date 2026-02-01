@@ -54,6 +54,37 @@ export default function AdminProducts() {
   };
 
   const handleRemoveVariation = (varId) => { setFormData({ ...formData, variations: formData.variations.filter(v => v.id !== varId) }); };
+  
+  const handleEditVariation = (variation) => {
+    setEditingVariationId(variation.id);
+    setEditingVariationData({ ...variation, price: String(variation.price), original_price: variation.original_price ? String(variation.original_price) : '' });
+  };
+  
+  const handleSaveVariation = () => {
+    if (!editingVariationData.name || !editingVariationData.price) { toast.error('Variation name and price are required'); return; }
+    const updatedVariations = formData.variations.map(v => 
+      v.id === editingVariationId 
+        ? { ...editingVariationData, price: parseFloat(editingVariationData.price), original_price: editingVariationData.original_price ? parseFloat(editingVariationData.original_price) : null }
+        : v
+    );
+    setFormData({ ...formData, variations: updatedVariations });
+    setEditingVariationId(null);
+    setEditingVariationData(emptyVariation);
+  };
+  
+  const handleCancelEditVariation = () => {
+    setEditingVariationId(null);
+    setEditingVariationData(emptyVariation);
+  };
+  
+  const handleMoveVariation = (index, direction) => {
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= formData.variations.length) return;
+    const newVariations = [...formData.variations];
+    [newVariations[index], newVariations[newIndex]] = [newVariations[newIndex], newVariations[index]];
+    setFormData({ ...formData, variations: newVariations });
+  };
+  
   const handleToggleTag = (tag) => { setFormData({ ...formData, tags: formData.tags.includes(tag) ? formData.tags.filter(t => t !== tag) : [...formData.tags, tag] }); };
 
   const handleAddCustomField = () => {
