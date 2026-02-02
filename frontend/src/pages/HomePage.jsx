@@ -5,7 +5,6 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import ProductCard from '@/components/ProductCard';
 import ReviewCard from '@/components/ReviewCard';
-import LivePurchaseTicker from '@/components/LivePurchaseTicker';
 import { Button } from '@/components/ui/button';
 import { productsAPI, categoriesAPI, reviewsAPI, notificationBarAPI, blogAPI, paymentMethodsAPI } from '@/lib/api';
 
