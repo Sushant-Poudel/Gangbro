@@ -17,6 +17,8 @@ import jwt
 import secrets
 import shutil
 import httpx
+from email_service import send_email, get_order_confirmation_email, get_order_status_update_email, get_welcome_email
+
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -44,6 +46,62 @@ security = HTTPBearer()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# ==================== RATE LIMITING ====================
+from collections import defaultdict
+from time import time
+
+# In-memory rate limiter (for production, use Redis)
+rate_limit_store = defaultdict(list)
+
+def rate_limit_check(ip: str, limit: int = 100, window: int = 60):
+    """Check if IP is rate limited. Returns True if allowed, False if limited."""
+    now = time()
+    # Clean old requests
+    rate_limit_store[ip] = [req_time for req_time in rate_limit_store[ip] if now - req_time < window]
+    
+    if len(rate_limit_store[ip]) >= limit:
+        return False
+    
+    rate_limit_store[ip].append(now)
+    return True
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """Rate limiting middleware"""
+    client_ip = request.client.host
+    
+    # Skip rate limiting for health checks
+    if request.url.path == "/health":
+        return await call_next(request)
+    
+    # More strict for login endpoints
+    if "/auth/login" in request.url.path:
+        if not rate_limit_check(client_ip, limit=10, window=60):
+            return fastapi.responses.JSONResponse(
+                status_code=429,
+                content={"detail": "Too many login attempts. Please try again later."}
+            )
+    else:
+        # General rate limit
+        if not rate_limit_check(client_ip, limit=100, window=60):
+            return fastapi.responses.JSONResponse(
+                status_code=429,
+                content={"detail": "Too many requests. Please slow down."}
+            )
+    
+    return await call_next(request)
+
+# ==================== SECURITY HEADERS ====================
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    """Add security headers"""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
 # ==================== MODELS ====================
 
 class UserCreate(BaseModel):
@@ -62,6 +120,35 @@ class User(BaseModel):
     name: str
     is_admin: bool = True
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
+# Customer Models
+class CustomerProfile(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    email: str
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    last_login: Optional[str] = None
+
+class OTPRequest(BaseModel):
+    email: str
+    name: Optional[str] = None
+
+class OTPVerify(BaseModel):
+    email: str
+    otp: str
+
+class OTPRecord(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    email: str
+    otp: str
+    expires_at: str
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    verified: bool = False
+
 
 class ProductVariation(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -176,11 +263,20 @@ class FAQReorderRequest(BaseModel):
 # Promo Code Models
 class PromoCodeCreate(BaseModel):
     code: str
-    discount_type: str = "percentage"  # "percentage" or "fixed"
+    discount_type: str = "percentage"  # "percentage", "fixed", "buy_x_get_y", "free_shipping"
     discount_value: float
     min_order_amount: float = 0
     max_uses: Optional[int] = None
+    max_uses_per_customer: Optional[int] = None
     is_active: bool = True
+    expiry_date: Optional[str] = None
+    applicable_categories: List[str] = []  # Empty means all categories
+    applicable_products: List[str] = []  # Empty means all products
+    first_time_only: bool = False
+    buy_quantity: Optional[int] = None  # For "buy X get Y" offers
+    get_quantity: Optional[int] = None
+    auto_apply: bool = False  # Auto-apply if conditions met
+    stackable: bool = False  # Can be combined with other promos
 
 class PromoCode(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -190,8 +286,17 @@ class PromoCode(BaseModel):
     discount_value: float
     min_order_amount: float = 0
     max_uses: Optional[int] = None
+    max_uses_per_customer: Optional[int] = None
     used_count: int = 0
     is_active: bool = True
+    expiry_date: Optional[str] = None
+    applicable_categories: List[str] = []
+    applicable_products: List[str] = []
+    first_time_only: bool = False
+    buy_quantity: Optional[int] = None
+    get_quantity: Optional[int] = None
+    auto_apply: bool = False
+    stackable: bool = False
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 # ==================== HELPERS ====================
@@ -252,6 +357,261 @@ async def login(credentials: UserLogin):
 @api_router.get("/auth/me")
 async def get_me(current_user: dict = Depends(get_current_user)):
     return current_user
+
+
+
+# ==================== CUSTOMER AUTH ROUTES ====================
+
+def generate_otp() -> str:
+    """Generate a 6-digit OTP"""
+    return str(secrets.randbelow(900000) + 100000)
+
+@api_router.post("/auth/customer/send-otp")
+async def send_customer_otp(request: OTPRequest):
+    """Send OTP to customer email"""
+    email = request.email.lower().strip()
+    
+    # Check if customer exists, if not create profile
+    customer = await db.customers.find_one({"email": email})
+    if not customer:
+        customer_data = {
+            "id": str(uuid.uuid4()),
+            "email": email,
+            "name": request.name or email.split("@")[0],
+            "phone": None,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "last_login": None
+        }
+        await db.customers.insert_one(customer_data)
+        logger.info(f"New customer created: {email}")
+    
+    # Generate OTP
+    otp = generate_otp()
+    expires_at = (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat()
+    
+    # Store OTP
+    otp_record = OTPRecord(
+        email=email,
+        otp=otp,
+        expires_at=expires_at
+    )
+    
+    # Delete old OTPs for this email
+    await db.otp_records.delete_many({"email": email})
+    await db.otp_records.insert_one(otp_record.model_dump())
+    
+    # Send OTP via email
+    try:
+        subject = f"Your GSN Login Code: {otp}"
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #000000; color: #ffffff;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="text-align: center; padding: 30px 0; border-bottom: 2px solid #F5A623;">
+                    <h1 style="margin: 0; color: #F5A623; font-size: 32px; font-weight: bold;">GSN</h1>
+                    <p style="margin: 10px 0 0; color: #888;">GameShop Nepal</p>
+                </div>
+                
+                <div style="padding: 40px 0; text-align: center;">
+                    <h2 style="color: #F5A623; margin: 0 0 20px;">Your Login Code</h2>
+                    <p style="color: #cccccc; margin-bottom: 30px;">Use this code to log in to your account:</p>
+                    
+                    <div style="background: linear-gradient(145deg, #1a1a1a, #0a0a0a); border: 2px solid #F5A623; border-radius: 12px; padding: 30px; margin: 20px 0;">
+                        <div style="font-size: 48px; font-weight: bold; color: #F5A623; letter-spacing: 8px; font-family: monospace;">
+                            {otp}
+                        </div>
+                    </div>
+                    
+                    <p style="color: #888; font-size: 14px; margin-top: 30px;">
+                        This code expires in 10 minutes.
+                    </p>
+                    <p style="color: #666; font-size: 12px; margin-top: 10px;">
+                        If you didn't request this code, please ignore this email.
+                    </p>
+                </div>
+                
+                <div style="text-align: center; padding: 30px 0; border-top: 1px solid #2a2a2a;">
+                    <p style="color: #888; margin: 5px 0;">Questions? Contact us on WhatsApp</p>
+                    <p style="color: #888; margin: 5px 0;">+977 9743488871</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        text = f"""
+        GSN - GAMESHOP NEPAL
+        
+        Your Login Code: {otp}
+        
+        This code expires in 10 minutes.
+        
+        If you didn't request this code, please ignore this email.
+        
+        Questions? WhatsApp: +977 9743488871
+        """
+        
+        send_email(email, subject, html, text)
+        logger.info(f"OTP sent to {email}")
+    except Exception as e:
+        logger.error(f"Failed to send OTP email: {e}")
+    
+    # Return OTP in response if debug mode enabled (for testing without email)
+    if os.environ.get("DEBUG_MODE") == "true":
+        return {"message": "OTP sent (debug mode)", "otp": otp, "expires_in": "10 minutes"}
+    
+    return {"message": "OTP sent to your email", "expires_in": "10 minutes"}
+
+@api_router.post("/auth/customer/verify-otp")
+async def verify_customer_otp(verify: OTPVerify):
+    """Verify OTP and create customer session"""
+    email = verify.email.lower().strip()
+    
+    # Find OTP record
+    otp_record = await db.otp_records.find_one({
+        "email": email,
+        "otp": verify.otp,
+        "verified": False
+    })
+    
+    if not otp_record:
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+    
+    # Check expiry
+    expires_at = datetime.fromisoformat(otp_record["expires_at"].replace('Z', '+00:00'))
+    if datetime.now(timezone.utc) > expires_at:
+        raise HTTPException(status_code=400, detail="OTP expired. Please request a new one.")
+    
+    # Mark OTP as verified
+    await db.otp_records.update_one(
+        {"id": otp_record["id"]},
+        {"$set": {"verified": True}}
+    )
+    
+    # Update customer last login
+    await db.customers.update_one(
+        {"email": email},
+        {"$set": {"last_login": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    # Get customer profile
+    customer = await db.customers.find_one({"email": email}, {"_id": 0})
+    
+    # If customer doesn't exist somehow, create it
+    if not customer:
+        customer = {
+            "id": str(uuid.uuid4()),
+            "email": email,
+            "name": email.split("@")[0],
+            "phone": None,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "last_login": datetime.now(timezone.utc).isoformat()
+        }
+        await db.customers.insert_one(customer)
+    
+    # Create JWT token for customer
+    token = create_token(customer["id"])
+    
+    return {
+        "token": token,
+        "customer": customer,
+        "message": "Login successful"
+    }
+
+async def get_current_customer(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Get current logged-in customer"""
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = payload.get("user_id")
+        
+        # Check if it's a customer
+        customer = await db.customers.find_one({"id": user_id}, {"_id": 0})
+        if customer:
+            return customer
+        
+        raise HTTPException(status_code=401, detail="Invalid customer token")
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+@api_router.get("/auth/customer/me")
+async def get_customer_profile(current_customer: dict = Depends(get_current_customer)):
+    """Get current customer profile"""
+    return current_customer
+
+
+# ==================== CUSTOMER ENDPOINTS ====================
+
+@api_router.get("/customer/orders")
+async def get_customer_orders(current_customer: dict = Depends(get_current_customer)):
+    """Get customer's order history"""
+    orders = await db.orders.find(
+        {"customer_email": current_customer["email"]},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    return orders
+
+@api_router.get("/customer/orders/{order_id}")
+async def get_customer_order_detail(order_id: str, current_customer: dict = Depends(get_current_customer)):
+    """Get specific order details"""
+    order = await db.orders.find_one({
+        "id": order_id,
+        "customer_email": current_customer["email"]
+    }, {"_id": 0})
+    
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    # Get status history
+    history = await db.order_status_history.find(
+        {"order_id": order_id},
+        {"_id": 0}
+    ).sort("created_at", 1).to_list(50)
+    
+    order["status_history"] = history
+    return order
+
+@api_router.get("/customer/stats")
+async def get_customer_stats(current_customer: dict = Depends(get_current_customer)):
+    """Get customer statistics"""
+    email = current_customer["email"]
+    
+    # Count orders
+    total_orders = await db.orders.count_documents({"customer_email": email})
+    
+    # Calculate total spent
+    orders = await db.orders.find({"customer_email": email}).to_list(1000)
+    total_spent = sum(order.get("total_amount", 0) for order in orders)
+    
+    # Count wishlist items
+    wishlist_count = await db.wishlists.count_documents({"email": email})
+    
+    return {
+        "total_orders": total_orders,
+        "total_spent": total_spent,
+        "wishlist_items": wishlist_count,
+        "member_since": current_customer.get("created_at", "")[:10]
+    }
+
+
+@api_router.put("/auth/customer/profile")
+async def update_customer_profile(name: str, phone: Optional[str] = None, current_customer: dict = Depends(get_current_customer)):
+    """Update customer profile"""
+    await db.customers.update_one(
+        {"id": current_customer["id"]},
+        {"$set": {"name": name, "phone": phone}}
+    )
+    
+    updated = await db.customers.find_one({"id": current_customer["id"]}, {"_id": 0})
+    return updated
 
 # ==================== IMAGE UPLOAD ====================
 
@@ -321,6 +681,87 @@ async def get_products(category_id: Optional[str] = None, active_only: bool = Tr
 
     products = await db.products.find(query, {"_id": 0}).sort([("sort_order", 1), ("created_at", -1)]).to_list(1000)
     return products
+
+@api_router.get("/products/search/advanced")
+async def advanced_product_search(
+    q: Optional[str] = None,
+    category_id: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    tags: Optional[str] = None,
+    sort_by: str = "relevance",  # relevance, price_low, price_high, newest
+    limit: int = 50
+):
+    """Advanced product search with filters"""
+    query = {"is_active": True}
+    
+    # Text search
+    if q:
+        query["$or"] = [
+            {"name": {"$regex": q, "$options": "i"}},
+            {"description": {"$regex": q, "$options": "i"}},
+            {"tags": {"$regex": q, "$options": "i"}}
+        ]
+    
+    # Category filter
+    if category_id:
+        query["category_id"] = category_id
+    
+    # Tags filter
+    if tags:
+        tag_list = [tag.strip() for tag in tags.split(",")]
+        query["tags"] = {"$in": tag_list}
+    
+    # Get products
+    products = await db.products.find(query, {"_id": 0}).to_list(1000)
+    
+    # Price filter (done in Python since prices are in variations)
+    if min_price is not None or max_price is not None:
+        filtered = []
+        for product in products:
+            if product.get("variations"):
+                prices = [v["price"] for v in product["variations"]]
+                min_p = min(prices)
+                max_p = max(prices)
+                
+                if min_price and max_p < min_price:
+                    continue
+                if max_price and min_p > max_price:
+                    continue
+                    
+                filtered.append(product)
+        products = filtered
+    
+    # Sorting
+    if sort_by == "price_low":
+        products.sort(key=lambda p: min([v["price"] for v in p.get("variations", [{"price": 0}])]))
+    elif sort_by == "price_high":
+        products.sort(key=lambda p: max([v["price"] for v in p.get("variations", [{"price": 0}])]), reverse=True)
+    elif sort_by == "newest":
+        products.sort(key=lambda p: p.get("created_at", ""), reverse=True)
+    
+    return products[:limit]
+
+@api_router.get("/products/search/suggestions")
+async def search_suggestions(q: str, limit: int = 5):
+    """Get search suggestions/autocomplete"""
+    if not q or len(q) < 2:
+        return []
+    
+    # Find matching products
+    products = await db.products.find(
+        {
+            "is_active": True,
+            "$or": [
+                {"name": {"$regex": f"^{q}", "$options": "i"}},
+                {"name": {"$regex": q, "$options": "i"}}
+            ]
+        },
+        {"_id": 0, "id": 1, "name": 1, "image_url": 1, "slug": 1}
+    ).limit(limit).to_list(limit)
+    
+    return products
+
 
 @api_router.put("/products/reorder")
 async def reorder_products(order_data: ProductOrderUpdate, current_user: dict = Depends(get_current_user)):
@@ -818,6 +1259,173 @@ async def get_takeapp_orders(current_user: dict = Depends(get_current_user)):
             )
         return orders
 
+
+@api_router.post("/takeapp/sync-orders")
+async def sync_takeapp_orders_to_customers(current_user: dict = Depends(get_current_user)):
+    """Sync Take.app orders with customer accounts by email"""
+    if not TAKEAPP_API_KEY:
+        raise HTTPException(status_code=400, detail="Take.app API key not configured")
+    
+    try:
+        # Fetch all orders from Take.app
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{TAKEAPP_BASE_URL}/orders?api_key={TAKEAPP_API_KEY}")
+            if response.status_code != 200:
+                raise HTTPException(status_code=response.status_code, detail="Failed to fetch Take.app orders")
+            
+            takeapp_orders = response.json()
+        
+        synced_count = 0
+        updated_count = 0
+        
+        for takeapp_order in takeapp_orders:
+            takeapp_order_id = takeapp_order.get("id")
+            customer_email = takeapp_order.get("customer_email")
+            
+            if not customer_email:
+                continue  # Skip orders without email
+            
+            # Check if we have a local order with this Take.app ID
+            local_order = await db.orders.find_one({"takeapp_order_id": takeapp_order_id})
+            
+            if local_order:
+                # Update existing order status
+                takeapp_status = takeapp_order.get("status", "pending").lower()
+                status_map = {
+                    "paid": "completed",
+                    "pending": "pending",
+                    "cancelled": "cancelled",
+                    "refunded": "cancelled"
+                }
+                new_status = status_map.get(takeapp_status, "pending")
+                
+                await db.orders.update_one(
+                    {"id": local_order["id"]},
+                    {"$set": {
+                        "status": new_status,
+                        "takeapp_data": takeapp_order,
+                        "synced_at": datetime.now(timezone.utc).isoformat()
+                    }}
+                )
+                updated_count += 1
+            else:
+                # Create new order from Take.app data if customer exists
+                customer = await db.customers.find_one({"email": customer_email})
+                if customer:
+                    new_order = {
+                        "id": str(uuid.uuid4()),
+                        "takeapp_order_id": takeapp_order_id,
+                        "takeapp_order_number": takeapp_order.get("number"),
+                        "customer_name": takeapp_order.get("customer_name"),
+                        "customer_phone": takeapp_order.get("customer_phone"),
+                        "customer_email": customer_email,
+                        "items": [],
+                        "items_text": takeapp_order.get("remark", "Order from Take.app"),
+                        "total_amount": takeapp_order.get("total_amount", 0),
+                        "remark": takeapp_order.get("remark"),
+                        "status": "completed" if takeapp_order.get("status") == "paid" else "pending",
+                        "payment_url": f"https://take.app/{TAKEAPP_STORE_ALIAS}/orders/{takeapp_order_id}/pay",
+                        "takeapp_data": takeapp_order,
+                        "created_at": takeapp_order.get("created_at", datetime.now(timezone.utc).isoformat()),
+                        "synced_at": datetime.now(timezone.utc).isoformat()
+                    }
+                    await db.orders.insert_one(new_order)
+                    synced_count += 1
+        
+        return {
+            "success": True,
+            "synced": synced_count,
+            "updated": updated_count,
+            "total_takeapp_orders": len(takeapp_orders)
+        }
+    
+    except Exception as e:
+        logger.error(f"Failed to sync Take.app orders: {e}")
+        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
+
+@api_router.post("/takeapp/webhook")
+async def takeapp_webhook(request: Request):
+    """Webhook endpoint for Take.app order updates"""
+    try:
+        payload = await request.json()
+        logger.info(f"Take.app webhook received: {payload}")
+        
+        order_id = payload.get("id")
+        order_status = payload.get("status", "pending").lower()
+        customer_email = payload.get("customer_email")
+        
+        if not order_id:
+            return {"status": "ignored", "reason": "No order ID"}
+        
+        # Find local order
+        local_order = await db.orders.find_one({"takeapp_order_id": order_id})
+        
+        if local_order:
+            # Map Take.app status to our status
+            status_map = {
+                "paid": "completed",
+                "pending": "pending",
+                "cancelled": "cancelled",
+                "refunded": "cancelled"
+            }
+            new_status = status_map.get(order_status, "pending")
+            
+            # Update order
+            await db.orders.update_one(
+                {"id": local_order["id"]},
+                {"$set": {
+                    "status": new_status,
+                    "takeapp_data": payload,
+                    "webhook_received_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+            
+            logger.info(f"Updated order {local_order['id']} status to {new_status}")
+            
+            # Send email notification if customer exists and status changed
+            if customer_email and new_status != local_order.get("status"):
+                try:
+                    from email_service import send_email, get_order_status_update_email
+                    subject, html, text = get_order_status_update_email(local_order, new_status)
+                    send_email(customer_email, subject, html, text)
+                except Exception as e:
+                    logger.error(f"Failed to send status update email: {e}")
+            
+            return {"status": "success", "order_id": local_order["id"], "new_status": new_status}
+        else:
+            # Order not found locally, might be a new order
+            if customer_email:
+                customer = await db.customers.find_one({"email": customer_email})
+                if customer:
+                    # Create order from webhook
+                    new_order = {
+                        "id": str(uuid.uuid4()),
+                        "takeapp_order_id": order_id,
+                        "takeapp_order_number": payload.get("number"),
+                        "customer_name": payload.get("customer_name"),
+                        "customer_phone": payload.get("customer_phone"),
+                        "customer_email": customer_email,
+                        "items": [],
+                        "items_text": payload.get("remark", "Order from Take.app"),
+                        "total_amount": payload.get("total_amount", 0),
+                        "remark": payload.get("remark"),
+                        "status": "completed" if order_status == "paid" else "pending",
+                        "payment_url": f"https://take.app/{TAKEAPP_STORE_ALIAS}/orders/{order_id}/pay",
+                        "takeapp_data": payload,
+                        "created_at": payload.get("created_at", datetime.now(timezone.utc).isoformat()),
+                        "webhook_received_at": datetime.now(timezone.utc).isoformat()
+                    }
+                    await db.orders.insert_one(new_order)
+                    logger.info(f"Created new order from webhook: {new_order['id']}")
+                    return {"status": "created", "order_id": new_order["id"]}
+            
+            return {"status": "ignored", "reason": "Order not found and no customer email"}
+    
+    except Exception as e:
+        logger.error(f"Webhook processing failed: {e}")
+        return {"status": "error", "message": str(e)}
+
+
 @api_router.get("/takeapp/inventory")
 async def get_takeapp_inventory(current_user: dict = Depends(get_current_user)):
     if not TAKEAPP_API_KEY:
@@ -937,6 +1545,15 @@ async def create_order(order_data: CreateOrderRequest):
     }
 
     await db.orders.insert_one(local_order)
+
+    # Send order confirmation email
+    if order_data.customer_email:
+        try:
+            subject, html, text = get_order_confirmation_email(local_order)
+            send_email(order_data.customer_email, subject, html, text)
+            logger.info(f"Order confirmation email sent to {order_data.customer_email}")
+        except Exception as e:
+            logger.error(f"Failed to send order confirmation email: {e}")
 
     message = "Order created successfully"
     if takeapp_order_id:
@@ -1156,31 +1773,165 @@ async def delete_promo_code(code_id: str, current_user: dict = Depends(get_curre
     return {"message": "Promo code deleted"}
 
 @api_router.post("/promo-codes/validate")
-async def validate_promo_code(code: str, subtotal: float):
-    """Validate a promo code and return discount info"""
+async def validate_promo_code(
+    code: str, 
+    subtotal: float, 
+    cart_items: List[dict] = [], 
+    customer_email: Optional[str] = None
+):
+    """Validate a promo code with advanced rules"""
     promo = await db.promo_codes.find_one({"code": code.upper(), "is_active": True})
     if not promo:
         raise HTTPException(status_code=404, detail="Invalid promo code")
     
+    # Check expiry date
+    if promo.get("expiry_date"):
+        expiry = datetime.fromisoformat(promo["expiry_date"].replace('Z', '+00:00'))
+        if datetime.now(timezone.utc) > expiry:
+            raise HTTPException(status_code=400, detail="Promo code has expired")
+    
+    # Check minimum order amount
     if promo.get("min_order_amount", 0) > subtotal:
         raise HTTPException(status_code=400, detail=f"Minimum order amount is Rs {promo['min_order_amount']}")
     
+    # Check max uses
     if promo.get("max_uses") and promo.get("used_count", 0) >= promo["max_uses"]:
         raise HTTPException(status_code=400, detail="Promo code has reached maximum uses")
     
+    # Check max uses per customer
+    if customer_email and promo.get("max_uses_per_customer"):
+        customer_usage = await db.promo_usage.count_documents({
+            "promo_code": code.upper(),
+            "customer_email": customer_email
+        })
+        if customer_usage >= promo["max_uses_per_customer"]:
+            raise HTTPException(status_code=400, detail="You have already used this promo code")
+    
+    # Check first-time buyer restriction
+    if promo.get("first_time_only") and customer_email:
+        previous_orders = await db.orders.count_documents({"customer_email": customer_email})
+        if previous_orders > 0:
+            raise HTTPException(status_code=400, detail="This promo code is only for first-time buyers")
+    
+    # Check category/product restrictions
+    if promo.get("applicable_categories") or promo.get("applicable_products"):
+        cart_valid = False
+        for item in cart_items:
+            product_id = item.get("product_id")
+            if product_id:
+                product = await db.products.find_one({"id": product_id})
+                if product:
+                    # Check if product matches
+                    if promo.get("applicable_products") and product_id in promo["applicable_products"]:
+                        cart_valid = True
+                        break
+                    # Check if category matches
+                    if promo.get("applicable_categories") and product.get("category_id") in promo["applicable_categories"]:
+                        cart_valid = True
+                        break
+        
+        if not cart_valid:
+            raise HTTPException(status_code=400, detail="This promo code is not applicable to items in your cart")
+    
     # Calculate discount
+    discount = 0
+    discount_details = {}
+    
     if promo["discount_type"] == "percentage":
         discount = subtotal * (promo["discount_value"] / 100)
-    else:
-        discount = promo["discount_value"]
+        discount_details = {
+            "type": "percentage",
+            "value": promo["discount_value"],
+            "description": f"{promo['discount_value']}% off"
+        }
+    elif promo["discount_type"] == "fixed":
+        discount = min(promo["discount_value"], subtotal)
+        discount_details = {
+            "type": "fixed",
+            "value": promo["discount_value"],
+            "description": f"Rs {promo['discount_value']} off"
+        }
+    elif promo["discount_type"] == "buy_x_get_y":
+        buy_qty = promo.get("buy_quantity", 0)
+        get_qty = promo.get("get_quantity", 0)
+        discount_details = {
+            "type": "buy_x_get_y",
+            "buy_quantity": buy_qty,
+            "get_quantity": get_qty,
+            "description": f"Buy {buy_qty}, Get {get_qty} Free"
+        }
+    elif promo["discount_type"] == "free_shipping":
+        discount_details = {
+            "type": "free_shipping",
+            "description": "Free Shipping"
+        }
     
     return {
         "valid": True,
         "code": promo["code"],
         "discount_type": promo["discount_type"],
         "discount_value": promo["discount_value"],
-        "discount_amount": round(discount, 2)
+        "discount_amount": round(discount, 2),
+        "details": discount_details,
+        "stackable": promo.get("stackable", False),
+        "message": f"Promo code applied! {discount_details.get('description', '')}"
     }
+
+@api_router.get("/promo-codes/auto-apply")
+async def get_auto_apply_promos(subtotal: float, customer_email: Optional[str] = None):
+    """Get all auto-apply promo codes that match the criteria"""
+    query = {"is_active": True, "auto_apply": True}
+    
+    # Check expiry
+    now = datetime.now(timezone.utc).isoformat()
+    query["$or"] = [
+        {"expiry_date": None},
+        {"expiry_date": {"$gt": now}}
+    ]
+    
+    promos = await db.promo_codes.find(query, {"_id": 0}).to_list(100)
+    
+    applicable_promos = []
+    for promo in promos:
+        try:
+            # Validate each promo
+            validation = await validate_promo_code(
+                promo["code"], 
+                subtotal, 
+                [], 
+                customer_email
+            )
+            applicable_promos.append({
+                "code": promo["code"],
+                "discount_amount": validation["discount_amount"],
+                "description": validation["details"]["description"]
+            })
+        except:
+            continue
+    
+    return applicable_promos
+
+@api_router.post("/promo-codes/record-usage")
+async def record_promo_usage(promo_code: str, order_id: str, customer_email: Optional[str] = None):
+    """Record promo code usage"""
+    # Increment usage count
+    await db.promo_codes.update_one(
+        {"code": promo_code.upper()},
+        {"$inc": {"used_count": 1}}
+    )
+    
+    # Record individual usage
+    usage_record = {
+        "id": str(uuid.uuid4()),
+        "promo_code": promo_code.upper(),
+        "order_id": order_id,
+        "customer_email": customer_email,
+        "used_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.promo_usage.insert_one(usage_record)
+    
+    return {"message": "Promo usage recorded"}
+
 
 # ==================== BUNDLE DEALS ====================
 
@@ -1437,9 +2188,13 @@ class OrderStatusUpdate(BaseModel):
 
 @api_router.get("/orders/track/{order_id}")
 async def track_order(order_id: str):
-    """Public order tracking by order ID"""
+    """Public order tracking by order ID or order number"""
     order = await db.orders.find_one(
-        {"$or": [{"id": order_id}, {"takeapp_order_id": order_id}]},
+        {"$or": [
+            {"id": order_id}, 
+            {"takeapp_order_id": order_id},
+            {"takeapp_order_number": order_id}
+        ]},
         {"_id": 0}
     )
     
@@ -1490,6 +2245,15 @@ async def update_order_status(order_id: str, status_data: OrderStatusUpdate, cur
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.order_status_history.insert_one(history_entry)
+    
+    # Send status update email
+    if order.get("customer_email"):
+        try:
+            subject, html, text = get_order_status_update_email(order, status_data.status)
+            send_email(order["customer_email"], subject, html, text)
+            logger.info(f"Order status update email sent to {order['customer_email']}")
+        except Exception as e:
+            logger.error(f"Failed to send status update email: {e}")
     
     return {"message": f"Order status updated to {status_data.status}"}
 

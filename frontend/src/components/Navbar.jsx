@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Search } from 'lucide-react';
+import { Menu, X, Search, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CartSidebar } from '@/components/Cart';
 import { LanguageToggle } from '@/components/Language';
 import { CustomerAccountSidebar } from '@/components/CustomerAccount';
+import CustomerAuthModal from '@/components/CustomerAuth';
 
 const LOGO_URL = "https://customer-assets.emergentagent.com/job_8ec93a6a-4f80-4dde-b760-4bc71482fa44/artifacts/4uqt5osn_Staff.zip%20-%201.png";
 
@@ -12,14 +13,27 @@ export default function Navbar({ notificationBarHeight = 0 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [customer, setCustomer] = useState(null);
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Check if customer is logged in
+  useEffect(() => {
+    const customerInfo = localStorage.getItem('customer_info');
+    if (customerInfo) {
+      try {
+        setCustomer(JSON.parse(customerInfo));
+      } catch (e) {
+        // Invalid data
+      }
+    }
+  }, []);
 
   const navLinks = [
     { href: '/', label: 'Home' },
     { href: '/about', label: 'About' },
     { href: '/blog', label: 'Blog' },
-    { href: '/track', label: 'Track Order' },
   ];
 
   const isActive = (path) => location.pathname === path;
@@ -99,7 +113,30 @@ export default function Navbar({ notificationBarHeight = 0 }) {
             {/* Cart */}
             <CartSidebar />
             
-            {/* Customer Account */}
+            {/* Customer Account/Login */}
+            {customer ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/account')}
+                className="text-white/60 hover:text-gold-500 p-2"
+                data-testid="customer-account-btn"
+              >
+                <User className="h-5 w-5" />
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAuthModal(true)}
+                className="text-white/60 hover:text-gold-500"
+                data-testid="customer-login-btn"
+              >
+                <User className="mr-2 h-5 w-5" />
+                Login
+              </Button>
+            )}
+            
             <CustomerAccountSidebar />
           </div>
 
@@ -108,6 +145,28 @@ export default function Navbar({ notificationBarHeight = 0 }) {
               <Search className="h-5 w-5" />
             </Button>
             <CartSidebar />
+            
+            {/* Mobile Customer Account/Login */}
+            {customer ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/account')}
+                className="text-white/60 hover:text-gold-500 p-2"
+              >
+                <User className="h-5 w-5" />
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAuthModal(true)}
+                className="text-white/60 hover:text-gold-500 p-2"
+              >
+                <User className="h-5 w-5" />
+              </Button>
+            )}
+            
             <CustomerAccountSidebar />
             <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 text-white" data-testid="mobile-menu-toggle">
               {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -159,6 +218,13 @@ export default function Navbar({ notificationBarHeight = 0 }) {
           </div>
         )}
       </div>
+
+      {/* Customer Auth Modal */}
+      <CustomerAuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={(customerData) => setCustomer(customerData)}
+      />
     </nav>
   );
 }

@@ -38,6 +38,20 @@ export default function AdminTakeApp() {
     toast.success('Data refreshed!');
   };
 
+  const handleSyncOrders = async () => {
+    setIsRefreshing(true);
+    try {
+      const response = await takeappAPI.syncOrders();
+      toast.success(`Synced ${response.data.synced} new orders, updated ${response.data.updated} existing orders`);
+      await fetchData();
+    } catch (error) {
+      toast.error('Failed to sync orders');
+      console.error(error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const getStatusBadge = (status) => {
     const statusMap = {
       'ORDER_STATUS_PENDING': { label: 'Pending', className: 'bg-yellow-500/20 text-yellow-400' },
@@ -81,10 +95,15 @@ export default function AdminTakeApp() {
     <AdminLayout title="Take.app Integration">
       <div className="space-y-4 lg:space-y-6" data-testid="admin-takeapp">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <p className="text-white/60 text-sm lg:text-base">View recent orders from Take.app</p>
-          <Button onClick={handleRefresh} disabled={isRefreshing} variant="outline" className="border-gold-500 text-gold-500 w-full sm:w-auto">
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />Refresh
-          </Button>
+          <p className="text-white/60 text-sm lg:text-base">View and sync orders from Take.app with customer accounts</p>
+          <div className="flex gap-2">
+            <Button onClick={handleSyncOrders} disabled={isRefreshing} className="bg-gold-500 hover:bg-gold-600 text-black">
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />Sync to Customers
+            </Button>
+            <Button onClick={handleRefresh} disabled={isRefreshing} variant="outline" className="border-gold-500 text-gold-500">
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />Refresh
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (

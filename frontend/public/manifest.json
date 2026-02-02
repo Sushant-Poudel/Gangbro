@@ -4,13 +4,13 @@
   "description": "Buy Netflix, Spotify, PUBG UC and more at the best prices in Nepal",
   "icons": [
     {
-      "src": "https://customer-assets.emergentagent.com/job_8ec93a6a-4f80-4dde-b760-4bc71482fa44/artifacts/4uqt5osn_Staff.zip%20-%201.png",
+      "src": "favicon.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://customer-assets.emergentagent.com/job_8ec93a6a-4f80-4dde-b760-4bc71482fa44/artifacts/4uqt5osn_Staff.zip%20-%201.png",
+      "src": "favicon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -27,7 +27,7 @@
     {
       "name": "Track Order",
       "url": "/track",
-      "icons": [{ "src": "https://customer-assets.emergentagent.com/job_8ec93a6a-4f80-4dde-b760-4bc71482fa44/artifacts/4uqt5osn_Staff.zip%20-%201.png", "sizes": "96x96" }]
+      "icons": [{ "src": "favicon.png", "sizes": "96x96" }]
     }
   ]
 }

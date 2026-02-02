@@ -12,7 +12,7 @@ import FAQPage from "@/pages/FAQPage";
 import TermsPage from "@/pages/TermsPage";
 import BlogPage from "@/pages/BlogPage";
 import BlogPostPage from "@/pages/BlogPostPage";
-import OrderTrackingPage from "@/pages/OrderTrackingPage";
+import CustomerAccountPage from "@/pages/CustomerAccountPage";
 import AdminLogin from "@/pages/admin/AdminLogin";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminProducts from "@/pages/admin/AdminProducts";
@@ -50,7 +50,7 @@ function App() {
                   <Route path="/terms" element={<TermsPage />} />
                   <Route path="/blog" element={<BlogPage />} />
                   <Route path="/blog/:slug" element={<BlogPostPage />} />
-                  <Route path="/track" element={<OrderTrackingPage />} />
+                  <Route path="/account" element={<CustomerAccountPage />} />
 
                   <Route path="/admin/login" element={<AdminLogin />} />
                   <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />

@@ -49,7 +49,7 @@ export default function OrderTrackingPage() {
         <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-white mb-2">Track Your Order</h1>
-            <p className="text-gray-400">Enter your order ID to check the status</p>
+            <p className="text-gray-400">Enter your Take.app order number to check the status</p>
           </div>
 
           <Card className="bg-zinc-900 border-zinc-800">
@@ -57,7 +57,7 @@ export default function OrderTrackingPage() {
               <form onSubmit={handleTrack} className="flex gap-3">
                 <Input
                   type="text"
-                  placeholder="Enter Order ID (e.g., abc123-def456)"
+                  placeholder="Enter Order Number (e.g., ORD-12345)"
                   value={orderId}
                   onChange={(e) => setOrderId(e.target.value)}
                   className="flex-1 bg-zinc-800 border-zinc-700 text-white"

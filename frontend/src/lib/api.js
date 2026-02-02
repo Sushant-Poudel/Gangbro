@@ -99,6 +99,7 @@ export const takeappAPI = {
   getInventory: () => api.get('/takeapp/inventory'),
   updateInventory: (itemId, quantity) => api.put(`/takeapp/inventory/${itemId}`, { quantity }),
   syncProducts: () => api.post('/takeapp/sync-products'),
+  syncOrders: () => api.post('/takeapp/sync-orders'),
 };
 
 export const ordersAPI = {
