@@ -288,7 +288,7 @@ def get_welcome_email(customer_name: str) -> tuple:
     - Gaming Top-ups (PUBG UC, Free Fire, Steam)
     - Software & Gift Cards
     
-    Visit: https://team-gangbdo.preview.emergentagent.com
+    Visit: {os.environ.get('SITE_URL', 'https://gameshopnepal.com')}
     
     Need help? WhatsApp: +977 9743488871
     
