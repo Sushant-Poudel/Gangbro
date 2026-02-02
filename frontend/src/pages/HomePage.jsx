@@ -251,9 +251,6 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* Live Purchase Ticker */}
-      <LivePurchaseTicker />
-
       <Footer />
     </div>
   );
