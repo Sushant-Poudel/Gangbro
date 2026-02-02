@@ -252,7 +252,7 @@ def get_welcome_email(customer_name: str) -> tuple:
             </div>
             
             <div style="text-align: center; margin: 30px 0;">
-                <a href="https://team-gangbdo.preview.emergentagent.com" 
+                <a href="{os.environ.get('SITE_URL', 'https://gameshopnepal.com')}" 
                    style="display: inline-block; background: #F5A623; color: #000; padding: 15px 40px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
                     Start Shopping
                 </a>
