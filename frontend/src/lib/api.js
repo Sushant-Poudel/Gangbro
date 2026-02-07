@@ -32,6 +32,13 @@ export const uploadAPI = {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
+  uploadPaymentImage: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/upload/payment', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
   getImageUrl: (path) => `${BACKEND_URL}${path}`,
 };
 
