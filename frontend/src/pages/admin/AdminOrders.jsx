@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { RefreshCw, Search, Package, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, Mail, Phone, User, Calendar, FileText } from 'lucide-react';
+import { RefreshCw, Search, Package, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, Mail, Phone, User, Calendar, FileText, Image, ExternalLink } from 'lucide-react';
 import AdminLayout from '@/components/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,8 +13,8 @@ import { ordersAPI, orderTrackingAPI } from '@/lib/api';
 
 const STATUS_OPTIONS = [
   { value: 'pending', label: 'Pending', icon: Clock, color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
-  { value: 'confirmed', label: 'Confirmed', icon: CheckCircle, color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
-  { value: 'completed', label: 'Completed', icon: CheckCircle, color: 'bg-green-500/20 text-green-400 border-green-500/30' },
+  { value: 'Confirmed', label: 'Confirmed', icon: CheckCircle, color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
+  { value: 'Completed', label: 'Completed', icon: CheckCircle, color: 'bg-green-500/20 text-green-400 border-green-500/30' },
   { value: 'cancelled', label: 'Cancelled', icon: XCircle, color: 'bg-red-500/20 text-red-400 border-red-500/30' },
 ];
 
