@@ -48,6 +48,7 @@ function App() {
                   <Route path="/product/:productSlug" element={<ProductPage />} />
                   <Route path="/checkout" element={<CheckoutPage />} />
                   <Route path="/payment/:orderId" element={<PaymentPage />} />
+                  <Route path="/invoice/:orderId" element={<InvoicePage />} />
                   <Route path="/about" element={<AboutPage />} />
                   <Route path="/faq" element={<FAQPage />} />
                   <Route path="/terms" element={<TermsPage />} />
