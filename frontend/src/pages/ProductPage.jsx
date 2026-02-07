@@ -155,12 +155,17 @@ export default function ProductPage() {
 
       const res = await ordersAPI.create(orderPayload);
       
-      // Redirect to our custom payment page
+      // Redirect to our custom payment page with all required data
       const params = new URLSearchParams({
         total: total.toFixed(2),
         items: `${product.name} (${currentVariation.name} x${quantity})`,
         name: orderForm.customer_name,
-        phone: orderForm.customer_phone
+        phone: orderForm.customer_phone,
+        email: orderForm.customer_email || '',
+        product: product.name,
+        variation: currentVariation.name,
+        price: currentVariation.price.toString(),
+        qty: quantity.toString()
       });
       
       // Send Trustpilot invitation if email was provided
