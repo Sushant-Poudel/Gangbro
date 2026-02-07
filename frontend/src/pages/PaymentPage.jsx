@@ -17,16 +17,18 @@ export default function PaymentPage() {
   const [selectedMethod, setSelectedMethod] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Order data from URL params
-  const orderTotal = searchParams.get('total') || '0';
-  const orderItems = searchParams.get('items') || '';
-  const customerName = searchParams.get('name') || '';
-  const customerPhone = searchParams.get('phone') || '';
-  const customerEmail = searchParams.get('email') || '';
-  const productName = searchParams.get('product') || '';
-  const variationName = searchParams.get('variation') || '';
-  const quantity = searchParams.get('qty') || '1';
-  const unitPrice = searchParams.get('price') || '0';
+  // Order data state - populated from URL params or API
+  const [orderData, setOrderData] = useState({
+    total: searchParams.get('total') || '0',
+    items: searchParams.get('items') || '',
+    customerName: searchParams.get('name') || '',
+    customerPhone: searchParams.get('phone') || '',
+    customerEmail: searchParams.get('email') || '',
+    productName: searchParams.get('product') || '',
+    variationName: searchParams.get('variation') || '',
+    quantity: searchParams.get('qty') || '1',
+    unitPrice: searchParams.get('price') || '0',
+  });
   
   // Screenshot upload
   const [screenshot, setScreenshot] = useState(null);
@@ -36,7 +38,34 @@ export default function PaymentPage() {
 
   useEffect(() => {
     fetchPaymentMethods();
+    // If URL params are missing data, fetch from API
+    if (!searchParams.get('product') || searchParams.get('total') === '0') {
+      fetchOrderData();
+    }
   }, []);
+
+  const fetchOrderData = async () => {
+    try {
+      const res = await ordersAPI.getOne(orderId);
+      const order = res.data;
+      if (order) {
+        const item = order.items?.[0];
+        setOrderData({
+          total: order.total?.toString() || order.total_amount?.toString() || '0',
+          items: order.items_text || order.items?.map(i => `${i.name} (${i.variation} x${i.quantity})`).join(', ') || '',
+          customerName: order.customer_name || '',
+          customerPhone: order.customer_phone || '',
+          customerEmail: order.customer_email || '',
+          productName: item?.name || item?.product_name || 'Product',
+          variationName: item?.variation || item?.variation_name || '',
+          quantity: item?.quantity?.toString() || '1',
+          unitPrice: item?.price?.toString() || '0',
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching order:', error);
+    }
+  };
 
   const fetchPaymentMethods = async () => {
     try {
