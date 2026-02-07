@@ -129,15 +129,16 @@ See invoice ${fullInvoiceUrl}`;
       const encodedMessage = encodeURIComponent(whatsappMessage);
       const whatsappNumber = '9779743488871';
       
-      // Open WhatsApp with pre-filled message
-      window.open(`https://wa.me/${whatsappNumber}?text=${encodedMessage}`, '_blank');
+      // Build WhatsApp URL
+      const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
       
-      toast.success('Order confirmed! Redirecting to WhatsApp...');
+      toast.success('Order confirmed! Opening WhatsApp...');
       
-      // Navigate to invoice page after a short delay
+      // Use location.href for mobile compatibility (window.open gets blocked)
+      // Small delay to show toast
       setTimeout(() => {
-        navigate(`/invoice/${orderId}`);
-      }, 1500);
+        window.location.href = whatsappUrl;
+      }, 500);
       
     } catch (error) {
       console.error('Error:', error);
