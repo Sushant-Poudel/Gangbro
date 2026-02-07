@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Check, ShoppingCart, Loader2, ExternalLink, AlertCircle, Ticket, X, Plus, Minus, AlertTriangle, Heart } from 'lucide-react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Check, ShoppingCart, Loader2, AlertCircle, Ticket, X, Plus, Minus, AlertTriangle, Heart } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import ProductCard from '@/components/ProductCard';
@@ -20,6 +20,7 @@ import { FlashSaleTimer } from '@/components/FlashSale';
 
 export default function ProductPage() {
   const { productSlug } = useParams();
+  const navigate = useNavigate();
   const { t } = useLanguage();
   const { addToCart, setIsOpen: setCartOpen } = useCart();
   const { isInWishlist, toggleWishlist } = useWishlist();
@@ -31,8 +32,6 @@ export default function ProductPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [orderStep, setOrderStep] = useState('form');
-  const [orderData, setOrderData] = useState(null);
   const [orderForm, setOrderForm] = useState({ customer_name: '', customer_phone: '', customer_email: '', custom_fields: {}, remark: '' });
   
   // Promo code state
@@ -155,22 +154,29 @@ export default function ProductPage() {
       };
 
       const res = await ordersAPI.create(orderPayload);
-      setOrderData({ order_id: res.data.order_id, takeapp_order_id: res.data.takeapp_order_id, payment_url: res.data.payment_url });
-      setOrderStep('payment');
+      
+      // Redirect to our custom payment page
+      const params = new URLSearchParams({
+        total: total.toFixed(2),
+        items: `${product.name} (${currentVariation.name} x${quantity})`,
+        name: orderForm.customer_name,
+        phone: orderForm.customer_phone
+      });
       
       // Send Trustpilot invitation if email was provided
       if (orderForm.customer_email) {
         sendTrustpilotInvitation({
           email: orderForm.customer_email,
           name: orderForm.customer_name,
-          orderId: res.data.takeapp_order_id || res.data.order_id,
+          orderId: res.data.order_id,
           productSlug: product.slug || product.id,
           productImage: product.image_url,
           productName: `${product.name} - ${currentVariation.name}`,
         });
       }
       
-      if (!res.data.payment_url) toast.warning('Order created but payment link not available. Please contact support.');
+      // Navigate to payment page
+      navigate(`/payment/${res.data.order_id}?${params.toString()}`);
     } catch (error) {
       console.error('Order error:', error);
       toast.error('Failed to place order. Please try again.');
@@ -179,15 +185,8 @@ export default function ProductPage() {
     }
   };
 
-  const handleOpenPayment = () => {
-    if (orderData?.payment_url) window.open(orderData.payment_url, '_blank');
-    else toast.error('Payment URL not available. Please try again.');
-  };
-
   const handleCloseDialog = () => {
     setIsOrderDialogOpen(false);
-    setOrderStep('form');
-    setOrderData(null);
     setOrderForm({ customer_name: '', customer_phone: '', customer_email: '', custom_fields: {}, remark: '' });
     setPromoCode('');
     setPromoDiscount(null);
@@ -382,10 +381,9 @@ export default function ProductPage() {
 
       <Dialog open={isOrderDialogOpen} onOpenChange={handleCloseDialog}>
         <DialogContent className="bg-card border-white/10 text-white max-w-md max-h-[90vh] overflow-y-auto sm:mx-auto">
-          <DialogHeader><DialogTitle className="font-heading text-xl uppercase">{orderStep === 'form' && t('placeYourOrder')}{orderStep === 'payment' && t('completePayment')}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="font-heading text-xl uppercase">{t('placeYourOrder')}</DialogTitle></DialogHeader>
 
-          {orderStep === 'form' && (
-            <form onSubmit={handleSubmitOrder} className="space-y-4">
+          <form onSubmit={handleSubmitOrder} className="space-y-4">
               <div className="bg-black/50 rounded-lg p-3 flex items-center gap-3">
                 <img src={product.image_url} alt={product.name} className="w-12 h-12 rounded object-cover" />
                 <div className="flex-1 min-w-0"><p className="text-white font-semibold text-sm truncate">{product.name}</p><p className="text-white/60 text-xs">{currentVariation?.name} × {quantity}</p></div>
@@ -485,32 +483,6 @@ export default function ProductPage() {
                 </Button>
               </div>
             </form>
-          )}
-
-          {orderStep === 'payment' && (
-            <div className="space-y-4 py-2">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4"><Check className="h-8 w-8 text-green-500" /></div>
-                <h3 className="text-lg font-semibold text-white mb-2">{t('orderCreated')}</h3>
-                <p className="text-white/60 text-sm">
-                  {orderData?.takeapp_order_id 
-                    ? 'Click the button below to complete your payment on Take.app'
-                    : 'Click the button below to contact us via WhatsApp to complete your order'}
-                </p>
-              </div>
-              <div className="bg-black/50 rounded-lg p-3 space-y-2"><div><p className="text-white/60 text-xs mb-1">Order ID:</p><p className="text-white font-mono text-sm truncate">{orderData?.takeapp_order_id || orderData?.order_id}</p></div></div>
-              <Button onClick={handleOpenPayment} className="w-full bg-gold-500 hover:bg-gold-600 text-black" data-testid="complete-payment-btn">
-                <ExternalLink className="mr-2 h-4 w-4" />
-                {orderData?.takeapp_order_id ? 'Complete Payment on Take.app' : 'Contact via WhatsApp'}
-              </Button>
-              <p className="text-white/40 text-xs text-center">
-                {orderData?.takeapp_order_id 
-                  ? 'You will be redirected to Take.app to complete your payment and upload proof.'
-                  : 'You will be redirected to WhatsApp to complete your order.'}
-              </p>
-              <Button variant="ghost" onClick={handleCloseDialog} className="w-full text-white/60">{t('close')}</Button>
-            </div>
-          )}
         </DialogContent>
       </Dialog>
 

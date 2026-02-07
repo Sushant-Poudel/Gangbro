@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Package, Heart, User, LogOut, ShoppingBag, Calendar, DollarSign, Edit, Save, X } from 'lucide-react';
+import { Package, Heart, User, LogOut, ShoppingBag, Calendar, DollarSign, Edit, Save, X, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
 
@@ -22,6 +22,22 @@ export default function CustomerAccountPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', phone: '' });
   const [saving, setSaving] = useState(false);
+  const [expandedOrderId, setExpandedOrderId] = useState(null);
+
+  const getStatusConfig = (status) => {
+    const configs = {
+      pending: { label: 'Pending', icon: Clock, bgColor: 'bg-yellow-500/20', textColor: 'text-yellow-500', borderColor: 'border-yellow-500/30' },
+      confirmed: { label: 'Confirmed', icon: CheckCircle, bgColor: 'bg-blue-500/20', textColor: 'text-blue-500', borderColor: 'border-blue-500/30' },
+      completed: { label: 'Completed', icon: CheckCircle, bgColor: 'bg-green-500/20', textColor: 'text-green-500', borderColor: 'border-green-500/30' },
+      processing: { label: 'Processing', icon: Clock, bgColor: 'bg-blue-500/20', textColor: 'text-blue-500', borderColor: 'border-blue-500/30' },
+      cancelled: { label: 'Cancelled', icon: XCircle, bgColor: 'bg-red-500/20', textColor: 'text-red-500', borderColor: 'border-red-500/30' },
+    };
+    return configs[status] || configs.pending;
+  };
+
+  const toggleOrderExpand = (orderId) => {
+    setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('customer_token');
@@ -228,50 +244,137 @@ export default function CustomerAccountPage() {
                 </CardContent>
               </Card>
             ) : (
-              orders.map((order) => (
-                <Card key={order.id} className="bg-card border-white/10 hover:border-gold-500/50 transition-colors">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-white">
-                          Order #{order.takeapp_order_number || order.id.slice(0, 8)}
-                        </CardTitle>
-                        <CardDescription className="text-white/60">
-                          {new Date(order.created_at).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                          })}
-                        </CardDescription>
+              orders.map((order) => {
+                const statusConfig = getStatusConfig(order.status);
+                const StatusIcon = statusConfig.icon;
+                const isExpanded = expandedOrderId === order.id;
+                
+                return (
+                  <Card key={order.id} className="bg-card border-white/10 hover:border-gold-500/50 transition-colors overflow-hidden">
+                    <CardHeader 
+                      className="cursor-pointer"
+                      onClick={() => toggleOrderExpand(order.id)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-white flex items-center gap-2">
+                            Order #{order.takeapp_order_number || order.id.slice(0, 8)}
+                          </CardTitle>
+                          <CardDescription className="text-white/60">
+                            {new Date(order.created_at).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })}
+                          </CardDescription>
+                        </div>
+                        <div className="text-right flex items-center gap-4">
+                          <div>
+                            <p className="text-2xl font-bold text-gold-500">
+                              Rs {order.total_amount.toLocaleString()}
+                            </p>
+                            <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold mt-2 ${statusConfig.bgColor} ${statusConfig.textColor} border ${statusConfig.borderColor}`}>
+                              <StatusIcon className="h-3 w-3" />
+                              {statusConfig.label.toUpperCase()}
+                            </span>
+                          </div>
+                          {isExpanded ? (
+                            <ChevronUp className="h-5 w-5 text-white/40" />
+                          ) : (
+                            <ChevronDown className="h-5 w-5 text-white/40" />
+                          )}
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-2xl font-bold text-gold-500">
-                          Rs {order.total_amount.toLocaleString()}
-                        </p>
-                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold mt-2 ${
-                          order.status === 'completed' ? 'bg-green-500/20 text-green-500' :
-                          order.status === 'processing' ? 'bg-blue-500/20 text-blue-500' :
-                          order.status === 'cancelled' ? 'bg-red-500/20 text-red-500' :
-                          'bg-yellow-500/20 text-yellow-500'
-                        }`}>
-                          {order.status?.toUpperCase() || 'PENDING'}
-                        </span>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-white/80">{order.items_text}</p>
-                    {order.payment_url && order.status === 'pending' && (
-                      <Button 
-                        onClick={() => window.open(order.payment_url, '_blank')}
-                        className="mt-4 bg-gold-500 hover:bg-gold-600 text-black"
-                      >
-                        Complete Payment
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
-              ))
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-white/80">{order.items_text}</p>
+                      
+                      {/* Expanded Status History */}
+                      {isExpanded && (
+                        <div className="mt-6 pt-4 border-t border-white/10">
+                          <h4 className="text-white font-semibold text-sm uppercase tracking-wider mb-4">Order Timeline</h4>
+                          
+                          {/* Status Progress */}
+                          <div className="flex items-center justify-between mb-6">
+                            {['pending', 'confirmed', 'completed'].map((step, idx) => {
+                              const stepConfig = getStatusConfig(step);
+                              const StepIcon = stepConfig.icon;
+                              const currentStepIndex = ['pending', 'confirmed', 'completed'].indexOf(order.status);
+                              const isActive = idx <= currentStepIndex && order.status !== 'cancelled';
+                              const isCancelled = order.status === 'cancelled';
+                              
+                              return (
+                                <div key={step} className="flex-1 flex flex-col items-center relative">
+                                  {idx > 0 && (
+                                    <div className={`absolute left-0 right-1/2 top-4 h-0.5 -translate-y-1/2 ${
+                                      isActive && idx <= currentStepIndex ? 'bg-gold-500' : 'bg-white/10'
+                                    }`} style={{ left: '-50%' }} />
+                                  )}
+                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center z-10 ${
+                                    isCancelled ? 'bg-red-500/20 border border-red-500/30' :
+                                    isActive ? 'bg-gold-500 text-black' : 'bg-white/10 text-white/40'
+                                  }`}>
+                                    {isCancelled && idx === currentStepIndex ? (
+                                      <XCircle className="h-4 w-4 text-red-500" />
+                                    ) : (
+                                      <StepIcon className="h-4 w-4" />
+                                    )}
+                                  </div>
+                                  <span className={`text-xs mt-2 capitalize ${
+                                    isActive && !isCancelled ? 'text-gold-500' : 'text-white/40'
+                                  }`}>
+                                    {step}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Status History List */}
+                          {order.status_history && order.status_history.length > 0 && (
+                            <div className="space-y-3">
+                              <h5 className="text-white/60 text-xs uppercase tracking-wider">History</h5>
+                              {order.status_history.map((history, idx) => (
+                                <div key={idx} className="flex items-start gap-3 text-sm bg-black/30 rounded-lg p-3">
+                                  <div className="w-2 h-2 rounded-full bg-gold-500 mt-1.5 flex-shrink-0"></div>
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-white font-medium">
+                                        {history.old_status} → {history.new_status}
+                                      </span>
+                                    </div>
+                                    <p className="text-white/40 text-xs mt-1">
+                                      {new Date(history.created_at).toLocaleDateString('en-US', {
+                                        year: 'numeric',
+                                        month: 'short',
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })}
+                                    </p>
+                                    {history.note && (
+                                      <p className="text-white/60 text-xs mt-1 italic">"{history.note}"</p>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {order.payment_url && order.status === 'pending' && (
+                        <Button 
+                          onClick={() => window.open(order.payment_url, '_blank')}
+                          className="mt-4 bg-gold-500 hover:bg-gold-600 text-black"
+                        >
+                          Complete Payment
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })
             )}
           </TabsContent>
 

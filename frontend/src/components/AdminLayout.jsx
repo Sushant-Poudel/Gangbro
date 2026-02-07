@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Package, FolderOpen, Star, FileText, Share2, LogOut, Home, Menu, X, HelpCircle, Store, Bell, BookOpen, CreditCard, Ticket, Settings, Send, BarChart3, Users } from 'lucide-react';
+import { LayoutDashboard, Package, FolderOpen, Star, FileText, Share2, LogOut, Home, Menu, X, HelpCircle, Bell, BookOpen, CreditCard, Ticket, Settings, Send, BarChart3, Users, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const LOGO_URL = "https://customer-assets.emergentagent.com/job_8ec93a6a-4f80-4dde-b760-4bc71482fa44/artifacts/4uqt5osn_Staff.zip%20-%201.png";
@@ -8,6 +8,7 @@ const LOGO_URL = "https://customer-assets.emergentagent.com/job_8ec93a6a-4f80-4d
 const navItems = [
   { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
+  { path: '/admin/orders', label: 'Orders', icon: ShoppingCart },
   { path: '/admin/customers', label: 'Customers', icon: Users },
   { path: '/admin/categories', label: 'Categories', icon: FolderOpen },
   { path: '/admin/products', label: 'Products', icon: Package },
@@ -21,7 +22,6 @@ const navItems = [
   { path: '/admin/notification-bar', label: 'Notification Bar', icon: Bell },
   { path: '/admin/blog', label: 'Blog / Guides', icon: BookOpen },
   { path: '/admin/trustpilot', label: 'Trustpilot', icon: Send },
-  { path: '/admin/takeapp', label: 'Take.app', icon: Store },
 ];
 
 export default function AdminLayout({ children, title }) {

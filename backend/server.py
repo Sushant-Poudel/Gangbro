@@ -553,11 +553,19 @@ async def get_customer_profile(current_customer: dict = Depends(get_current_cust
 
 @api_router.get("/customer/orders")
 async def get_customer_orders(current_customer: dict = Depends(get_current_customer)):
-    """Get customer's order history"""
+    """Get customer's order history with status history"""
     orders = await db.orders.find(
         {"customer_email": current_customer["email"]},
         {"_id": 0}
     ).sort("created_at", -1).to_list(100)
+    
+    # Fetch status history for each order
+    for order in orders:
+        history = await db.order_status_history.find(
+            {"order_id": order.get("id")},
+            {"_id": 0}
+        ).sort("created_at", 1).to_list(50)
+        order["status_history"] = history
     
     return orders
 
@@ -1226,219 +1234,6 @@ async def seed_data():
 
     return {"message": "Data seeded successfully"}
 
-# ==================== TAKE.APP INTEGRATION ====================
-
-TAKEAPP_API_KEY = os.environ.get("TAKEAPP_API_KEY", "")
-TAKEAPP_BASE_URL = "https://take.app/api/platform"
-
-@api_router.get("/takeapp/store")
-async def get_takeapp_store(current_user: dict = Depends(get_current_user)):
-    if not TAKEAPP_API_KEY:
-        raise HTTPException(status_code=400, detail="Take.app API key not configured")
-
-    async with httpx.AsyncClient() as client:
-        response = await client.get(f"{TAKEAPP_BASE_URL}/me?api_key={TAKEAPP_API_KEY}")
-        if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail="Failed to fetch store info")
-        return response.json()
-
-@api_router.get("/takeapp/orders")
-async def get_takeapp_orders(current_user: dict = Depends(get_current_user)):
-    if not TAKEAPP_API_KEY:
-        raise HTTPException(status_code=400, detail="Take.app API key not configured")
-
-    async with httpx.AsyncClient() as client:
-        response = await client.get(f"{TAKEAPP_BASE_URL}/orders?api_key={TAKEAPP_API_KEY}")
-        if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail="Failed to fetch orders")
-
-        orders = response.json()
-        for order in orders:
-            await db.takeapp_orders.update_one(
-                {"id": order["id"]},
-                {"$set": order},
-                upsert=True
-            )
-        return orders
-
-
-@api_router.post("/takeapp/sync-orders")
-async def sync_takeapp_orders_to_customers(current_user: dict = Depends(get_current_user)):
-    """Sync Take.app orders with customer accounts by email"""
-    if not TAKEAPP_API_KEY:
-        raise HTTPException(status_code=400, detail="Take.app API key not configured")
-    
-    try:
-        # Fetch all orders from Take.app
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"{TAKEAPP_BASE_URL}/orders?api_key={TAKEAPP_API_KEY}")
-            if response.status_code != 200:
-                raise HTTPException(status_code=response.status_code, detail="Failed to fetch Take.app orders")
-            
-            takeapp_orders = response.json()
-        
-        synced_count = 0
-        updated_count = 0
-        
-        for takeapp_order in takeapp_orders:
-            takeapp_order_id = takeapp_order.get("id")
-            customer_email = takeapp_order.get("customer_email")
-            
-            if not customer_email:
-                continue  # Skip orders without email
-            
-            # Check if we have a local order with this Take.app ID
-            local_order = await db.orders.find_one({"takeapp_order_id": takeapp_order_id})
-            
-            if local_order:
-                # Update existing order status
-                takeapp_status = takeapp_order.get("status", "pending").lower()
-                status_map = {
-                    "paid": "completed",
-                    "pending": "pending",
-                    "cancelled": "cancelled",
-                    "refunded": "cancelled"
-                }
-                new_status = status_map.get(takeapp_status, "pending")
-                
-                await db.orders.update_one(
-                    {"id": local_order["id"]},
-                    {"$set": {
-                        "status": new_status,
-                        "takeapp_data": takeapp_order,
-                        "synced_at": datetime.now(timezone.utc).isoformat()
-                    }}
-                )
-                updated_count += 1
-            else:
-                # Create new order from Take.app data if customer exists
-                customer = await db.customers.find_one({"email": customer_email})
-                if customer:
-                    new_order = {
-                        "id": str(uuid.uuid4()),
-                        "takeapp_order_id": takeapp_order_id,
-                        "takeapp_order_number": takeapp_order.get("number"),
-                        "customer_name": takeapp_order.get("customer_name"),
-                        "customer_phone": takeapp_order.get("customer_phone"),
-                        "customer_email": customer_email,
-                        "items": [],
-                        "items_text": takeapp_order.get("remark", "Order from Take.app"),
-                        "total_amount": takeapp_order.get("total_amount", 0),
-                        "remark": takeapp_order.get("remark"),
-                        "status": "completed" if takeapp_order.get("status") == "paid" else "pending",
-                        "payment_url": f"https://take.app/{TAKEAPP_STORE_ALIAS}/orders/{takeapp_order_id}/pay",
-                        "takeapp_data": takeapp_order,
-                        "created_at": takeapp_order.get("created_at", datetime.now(timezone.utc).isoformat()),
-                        "synced_at": datetime.now(timezone.utc).isoformat()
-                    }
-                    await db.orders.insert_one(new_order)
-                    synced_count += 1
-        
-        return {
-            "success": True,
-            "synced": synced_count,
-            "updated": updated_count,
-            "total_takeapp_orders": len(takeapp_orders)
-        }
-    
-    except Exception as e:
-        logger.error(f"Failed to sync Take.app orders: {e}")
-        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
-
-@api_router.post("/takeapp/webhook")
-async def takeapp_webhook(request: Request):
-    """Webhook endpoint for Take.app order updates"""
-    try:
-        payload = await request.json()
-        logger.info(f"Take.app webhook received: {payload}")
-        
-        order_id = payload.get("id")
-        order_status = payload.get("status", "pending").lower()
-        customer_email = payload.get("customer_email")
-        
-        if not order_id:
-            return {"status": "ignored", "reason": "No order ID"}
-        
-        # Find local order
-        local_order = await db.orders.find_one({"takeapp_order_id": order_id})
-        
-        if local_order:
-            # Map Take.app status to our status
-            status_map = {
-                "paid": "completed",
-                "pending": "pending",
-                "cancelled": "cancelled",
-                "refunded": "cancelled"
-            }
-            new_status = status_map.get(order_status, "pending")
-            
-            # Update order
-            await db.orders.update_one(
-                {"id": local_order["id"]},
-                {"$set": {
-                    "status": new_status,
-                    "takeapp_data": payload,
-                    "webhook_received_at": datetime.now(timezone.utc).isoformat()
-                }}
-            )
-            
-            logger.info(f"Updated order {local_order['id']} status to {new_status}")
-            
-            # Send email notification if customer exists and status changed
-            if customer_email and new_status != local_order.get("status"):
-                try:
-                    from email_service import send_email, get_order_status_update_email
-                    subject, html, text = get_order_status_update_email(local_order, new_status)
-                    send_email(customer_email, subject, html, text)
-                except Exception as e:
-                    logger.error(f"Failed to send status update email: {e}")
-            
-            return {"status": "success", "order_id": local_order["id"], "new_status": new_status}
-        else:
-            # Order not found locally, might be a new order
-            if customer_email:
-                customer = await db.customers.find_one({"email": customer_email})
-                if customer:
-                    # Create order from webhook
-                    new_order = {
-                        "id": str(uuid.uuid4()),
-                        "takeapp_order_id": order_id,
-                        "takeapp_order_number": payload.get("number"),
-                        "customer_name": payload.get("customer_name"),
-                        "customer_phone": payload.get("customer_phone"),
-                        "customer_email": customer_email,
-                        "items": [],
-                        "items_text": payload.get("remark", "Order from Take.app"),
-                        "total_amount": payload.get("total_amount", 0),
-                        "remark": payload.get("remark"),
-                        "status": "completed" if order_status == "paid" else "pending",
-                        "payment_url": f"https://take.app/{TAKEAPP_STORE_ALIAS}/orders/{order_id}/pay",
-                        "takeapp_data": payload,
-                        "created_at": payload.get("created_at", datetime.now(timezone.utc).isoformat()),
-                        "webhook_received_at": datetime.now(timezone.utc).isoformat()
-                    }
-                    await db.orders.insert_one(new_order)
-                    logger.info(f"Created new order from webhook: {new_order['id']}")
-                    return {"status": "created", "order_id": new_order["id"]}
-            
-            return {"status": "ignored", "reason": "Order not found and no customer email"}
-    
-    except Exception as e:
-        logger.error(f"Webhook processing failed: {e}")
-        return {"status": "error", "message": str(e)}
-
-
-@api_router.get("/takeapp/inventory")
-async def get_takeapp_inventory(current_user: dict = Depends(get_current_user)):
-    if not TAKEAPP_API_KEY:
-        raise HTTPException(status_code=400, detail="Take.app API key not configured")
-
-    async with httpx.AsyncClient() as client:
-        response = await client.get(f"{TAKEAPP_BASE_URL}/inventory?api_key={TAKEAPP_API_KEY}")
-        if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail="Failed to fetch inventory")
-        return response.json()
-
 # Order creation models
 class OrderItem(BaseModel):
     name: str
@@ -1453,8 +1248,6 @@ class CreateOrderRequest(BaseModel):
     items: List[OrderItem]
     total_amount: float
     remark: Optional[str] = None
-
-TAKEAPP_STORE_ALIAS = "gsn"
 
 @api_router.post("/orders/create")
 async def create_order(order_data: CreateOrderRequest):
@@ -1471,68 +1264,9 @@ async def create_order(order_data: CreateOrderRequest):
     formatted_phone = format_phone_number(order_data.customer_phone)
 
     items_text = ", ".join([f"{item.quantity}x {item.name}" + (f" ({item.variation})" if item.variation else "") for item in order_data.items])
-    full_remark = f"Items: {items_text}"
-    if order_data.remark:
-        full_remark += f"\nNote: {order_data.remark}"
-
-    total_amount_rupees = str(int(order_data.total_amount))
-
-    takeapp_order_id = None
-    takeapp_order_number = None
-    payment_url = None
-
-    # Try Take.app integration if API key is configured
-    if TAKEAPP_API_KEY:
-        try:
-            async with httpx.AsyncClient() as client:
-                takeapp_payload = {
-                    "customer_name": order_data.customer_name,
-                    "customer_phone": formatted_phone,
-                    "total_amount": total_amount_rupees,
-                    "remark": full_remark
-                }
-                # Only include email if provided
-                if order_data.customer_email:
-                    takeapp_payload["customer_email"] = order_data.customer_email
-
-                logger.info(f"Creating Take.app order: {takeapp_payload}")
-
-                response = await client.post(
-                    f"{TAKEAPP_BASE_URL}/orders?api_key={TAKEAPP_API_KEY}",
-                    json=takeapp_payload,
-                    timeout=15.0
-                )
-
-                logger.info(f"Take.app response: {response.status_code} - {response.text}")
-
-                if response.status_code in [200, 201]:
-                    takeapp_result = response.json()
-                    takeapp_order_id = takeapp_result.get("id")
-                    takeapp_order_number = takeapp_result.get("number")
-                    payment_url = f"https://take.app/{TAKEAPP_STORE_ALIAS}/orders/{takeapp_order_id}/pay"
-                else:
-                    logger.warning(f"Take.app order creation failed: {response.status_code} - {response.text}")
-                    # Continue without Take.app - order will be saved locally
-        except Exception as e:
-            logger.warning(f"Take.app integration failed, saving order locally: {e}")
-            # Continue without Take.app - order will be saved locally
-
-    # Generate WhatsApp contact URL as fallback when Take.app is not configured
-    whatsapp_number = "9779743488871"  # GameShop Nepal WhatsApp
-    
-    # Use WhatsApp URL as fallback payment method if Take.app is not available
-    if not payment_url:
-        import urllib.parse
-        whatsapp_message = f"Hi! I'd like to place an order:\n\n{items_text}\n\nTotal: Rs {total_amount_rupees}\n\nName: {order_data.customer_name}\nPhone: {order_data.customer_phone}"
-        if order_data.remark:
-            whatsapp_message += f"\nNote: {order_data.remark}"
-        encoded_message = urllib.parse.quote(whatsapp_message)
-        payment_url = f"https://wa.me/{whatsapp_number}?text={encoded_message}"
 
     local_order = {
         "id": order_id,
-        "takeapp_order_id": takeapp_order_id,
-        "takeapp_order_number": takeapp_order_number,
         "customer_name": order_data.customer_name,
         "customer_phone": order_data.customer_phone,
         "customer_email": order_data.customer_email,
@@ -1542,7 +1276,7 @@ async def create_order(order_data: CreateOrderRequest):
         "items_text": items_text,
         "status": "pending",
         "payment_screenshot": None,
-        "payment_url": payment_url,
+        "payment_method": None,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
 
@@ -1557,19 +1291,10 @@ async def create_order(order_data: CreateOrderRequest):
         except Exception as e:
             logger.error(f"Failed to send order confirmation email: {e}")
 
-    message = "Order created successfully"
-    if takeapp_order_id:
-        message += " on Take.app"
-    else:
-        message += ". Contact us via WhatsApp to complete payment."
-
     return {
         "success": True,
         "order_id": order_id,
-        "takeapp_order_id": takeapp_order_id,
-        "takeapp_order_number": takeapp_order_number,
-        "payment_url": payment_url,
-        "message": message
+        "message": "Order created successfully"
     }
 
 @api_router.get("/orders")
@@ -1582,7 +1307,11 @@ async def get_local_orders(current_user: dict = Depends(get_current_user)):
 class PaymentMethod(BaseModel):
     id: Optional[str] = None
     name: str
-    image_url: str
+    image_url: str  # Logo/icon
+    qr_code_url: Optional[str] = None  # QR code image
+    merchant_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    instructions: Optional[str] = None  # Payment instructions text
     is_active: bool = True
     sort_order: int = 0
 
@@ -1599,6 +1328,13 @@ async def get_all_payment_methods(current_user: dict = Depends(get_current_user)
     for m in methods:
         m.pop("_id", None)
     return methods
+
+@api_router.get("/payment-methods/{method_id}")
+async def get_payment_method(method_id: str):
+    method = await db.payment_methods.find_one({"id": method_id}, {"_id": 0})
+    if not method:
+        raise HTTPException(status_code=404, detail="Payment method not found")
+    return method
 
 @api_router.post("/payment-methods")
 async def create_payment_method(method: PaymentMethod, current_user: dict = Depends(get_current_user)):
@@ -1619,6 +1355,30 @@ async def update_payment_method(method_id: str, method: PaymentMethod, current_u
 async def delete_payment_method(method_id: str, current_user: dict = Depends(get_current_user)):
     await db.payment_methods.delete_one({"id": method_id})
     return {"message": "Payment method deleted"}
+
+# ==================== ORDER PAYMENT SCREENSHOT ====================
+
+class PaymentScreenshotUpload(BaseModel):
+    screenshot_url: str
+    payment_method: Optional[str] = None
+
+@api_router.post("/orders/{order_id}/payment-screenshot")
+async def upload_payment_screenshot(order_id: str, data: PaymentScreenshotUpload):
+    """Upload payment screenshot for an order"""
+    order = await db.orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    await db.orders.update_one(
+        {"id": order_id},
+        {"$set": {
+            "payment_screenshot": data.screenshot_url,
+            "payment_method": data.payment_method,
+            "payment_uploaded_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    return {"message": "Payment screenshot uploaded", "order_id": order_id}
 
 # ==================== NOTIFICATION BAR ====================
 

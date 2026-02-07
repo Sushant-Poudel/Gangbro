@@ -1,15 +1,25 @@
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, CreditCard } from 'lucide-react';
+import { Plus, Pencil, Trash2, CreditCard, QrCode, Phone, FileText } from 'lucide-react';
 import AdminLayout from '@/components/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { paymentMethodsAPI } from '@/lib/api';
+import { paymentMethodsAPI, uploadAPI } from '@/lib/api';
 
-const emptyMethod = { name: '', image_url: '', is_active: true, sort_order: 0 };
+const emptyMethod = { 
+  name: '', 
+  image_url: '', 
+  qr_code_url: '',
+  merchant_name: '',
+  phone_number: '',
+  instructions: '',
+  is_active: true, 
+  sort_order: 0 
+};
 
 export default function AdminPaymentMethods() {
   const [methods, setMethods] = useState([]);
@@ -17,54 +27,145 @@ export default function AdminPaymentMethods() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingMethod, setEditingMethod] = useState(null);
   const [formData, setFormData] = useState(emptyMethod);
+  const [isUploading, setIsUploading] = useState({ logo: false, qr: false });
 
   const fetchMethods = async () => {
-    try { const res = await paymentMethodsAPI.getAllAdmin(); setMethods(res.data); } catch (error) { console.error('Error:', error); } finally { setIsLoading(false); }
+    try { 
+      const res = await paymentMethodsAPI.getAllAdmin(); 
+      setMethods(res.data); 
+    } catch (error) { 
+      console.error('Error:', error); 
+    } finally { 
+      setIsLoading(false); 
+    }
   };
 
   useEffect(() => { fetchMethods(); }, []);
 
   const handleOpenDialog = (method = null) => {
-    if (method) { setEditingMethod(method); setFormData({ name: method.name, image_url: method.image_url, is_active: method.is_active, sort_order: method.sort_order }); }
-    else { setEditingMethod(null); setFormData(emptyMethod); }
+    if (method) { 
+      setEditingMethod(method); 
+      setFormData({ 
+        name: method.name, 
+        image_url: method.image_url || '', 
+        qr_code_url: method.qr_code_url || '',
+        merchant_name: method.merchant_name || '',
+        phone_number: method.phone_number || '',
+        instructions: method.instructions || '',
+        is_active: method.is_active, 
+        sort_order: method.sort_order 
+      }); 
+    } else { 
+      setEditingMethod(null); 
+      setFormData(emptyMethod); 
+    }
     setIsDialogOpen(true);
+  };
+
+  const handleImageUpload = async (e, field) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const uploadKey = field === 'image_url' ? 'logo' : 'qr';
+    setIsUploading(prev => ({ ...prev, [uploadKey]: true }));
+    
+    try {
+      const res = await uploadAPI.uploadImage(file);
+      const fullUrl = `${process.env.REACT_APP_BACKEND_URL}${res.data.url}`;
+      setFormData(prev => ({ ...prev, [field]: fullUrl }));
+      toast.success('Image uploaded!');
+    } catch (error) {
+      toast.error('Failed to upload image');
+    } finally {
+      setIsUploading(prev => ({ ...prev, [uploadKey]: false }));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.image_url) { toast.error('Name and image URL are required'); return; }
+    if (!formData.name || !formData.image_url) { 
+      toast.error('Name and logo are required'); 
+      return; 
+    }
     try {
-      if (editingMethod) { await paymentMethodsAPI.update(editingMethod.id, formData); toast.success('Payment method updated!'); }
-      else { await paymentMethodsAPI.create(formData); toast.success('Payment method created!'); }
+      if (editingMethod) { 
+        await paymentMethodsAPI.update(editingMethod.id, formData); 
+        toast.success('Payment method updated!'); 
+      } else { 
+        await paymentMethodsAPI.create(formData); 
+        toast.success('Payment method created!'); 
+      }
       setIsDialogOpen(false);
       fetchMethods();
-    } catch (error) { toast.error(error.response?.data?.detail || 'Error saving payment method'); }
+    } catch (error) { 
+      toast.error(error.response?.data?.detail || 'Error saving payment method'); 
+    }
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure?')) return;
-    try { await paymentMethodsAPI.delete(id); toast.success('Payment method deleted!'); fetchMethods(); } catch (error) { toast.error('Error deleting payment method'); }
+    try { 
+      await paymentMethodsAPI.delete(id); 
+      toast.success('Payment method deleted!'); 
+      fetchMethods(); 
+    } catch (error) { 
+      toast.error('Error deleting payment method'); 
+    }
   };
 
   return (
     <AdminLayout title="Payment Methods">
       <div className="space-y-4 lg:space-y-6" data-testid="admin-payment-methods">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <p className="text-white/60 text-sm lg:text-base">Manage payment methods displayed on the homepage</p>
-          <Button onClick={() => handleOpenDialog()} className="bg-gold-500 hover:bg-gold-600 text-black w-full sm:w-auto" data-testid="add-payment-method-btn"><Plus className="h-4 w-4 mr-2" />Add Payment Method</Button>
+          <p className="text-white/60 text-sm lg:text-base">Manage payment methods for checkout (eSewa, Khalti, Bank, etc.)</p>
+          <Button onClick={() => handleOpenDialog()} className="bg-gold-500 hover:bg-gold-600 text-black w-full sm:w-auto" data-testid="add-payment-method-btn">
+            <Plus className="h-4 w-4 mr-2" />Add Payment Method
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
-          {isLoading ? [1, 2, 3].map((i) => <div key={i} className="h-24 skeleton rounded-lg"></div>) : methods.length === 0 ? (
-            <div className="col-span-full text-center py-12 bg-card border border-white/10 rounded-lg"><CreditCard className="h-12 w-12 mx-auto text-white/20 mb-4" /><p className="text-white/40">No payment methods yet</p></div>
+          {isLoading ? [1, 2, 3].map((i) => <div key={i} className="h-32 skeleton rounded-lg"></div>) : methods.length === 0 ? (
+            <div className="col-span-full text-center py-12 bg-card border border-white/10 rounded-lg">
+              <CreditCard className="h-12 w-12 mx-auto text-white/20 mb-4" />
+              <p className="text-white/40">No payment methods yet</p>
+              <p className="text-white/30 text-sm mt-2">Add eSewa, Khalti, Bank transfer, etc.</p>
+            </div>
           ) : methods.map((method) => (
-            <div key={method.id} className={`bg-card border rounded-lg p-4 hover:border-gold-500/30 transition-all ${method.is_active ? 'border-white/10' : 'border-red-500/30 opacity-60'}`} data-testid={`payment-method-${method.id}`}>
-              <div className="flex items-center gap-3">
-                <img src={method.image_url} alt={method.name} className="h-10 w-auto object-contain" onError={(e) => e.target.style.display = 'none'} />
-                <div className="flex-1 min-w-0"><h3 className="font-heading font-semibold text-white">{method.name}</h3>{!method.is_active && <span className="text-red-400 text-xs">Inactive</span>}</div>
+            <div 
+              key={method.id} 
+              className={`bg-card border rounded-lg p-4 hover:border-gold-500/30 transition-all ${method.is_active ? 'border-white/10' : 'border-red-500/30 opacity-60'}`} 
+              data-testid={`payment-method-${method.id}`}
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-12 h-12 bg-white/5 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  <img 
+                    src={method.image_url} 
+                    alt={method.name} 
+                    className="w-8 h-8 object-contain" 
+                    onError={(e) => e.target.style.display = 'none'} 
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-heading font-semibold text-white">{method.name}</h3>
+                  {method.phone_number && (
+                    <p className="text-white/40 text-xs flex items-center gap-1 mt-1">
+                      <Phone className="h-3 w-3" /> {method.phone_number}
+                    </p>
+                  )}
+                  {method.qr_code_url && (
+                    <p className="text-green-400 text-xs flex items-center gap-1 mt-1">
+                      <QrCode className="h-3 w-3" /> QR configured
+                    </p>
+                  )}
+                  {!method.is_active && <span className="text-red-400 text-xs">Inactive</span>}
+                </div>
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(method)} className="text-white/60 hover:text-gold-500 p-2"><Pencil className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleDelete(method.id)} className="text-white/60 hover:text-red-500 p-2"><Trash2 className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(method)} className="text-white/60 hover:text-gold-500 p-2">
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => handleDelete(method.id)} className="text-white/60 hover:text-red-500 p-2">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
             </div>
@@ -72,19 +173,144 @@ export default function AdminPaymentMethods() {
         </div>
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="bg-card border-white/10 text-white max-w-md sm:mx-auto">
-            <DialogHeader><DialogTitle className="font-heading text-xl uppercase">{editingMethod ? 'Edit Payment Method' : 'Add Payment Method'}</DialogTitle></DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4 lg:space-y-6">
-              <div className="space-y-2"><Label>Name</Label><Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="bg-black border-white/20" placeholder="e.g. eSewa" required /></div>
+          <DialogContent className="bg-card border-white/10 text-white max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="font-heading text-xl uppercase">
+                {editingMethod ? 'Edit Payment Method' : 'Add Payment Method'}
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Name */}
               <div className="space-y-2">
-                <Label>Logo Image URL</Label>
-                <Input value={formData.image_url} onChange={(e) => setFormData({ ...formData, image_url: e.target.value })} className="bg-black border-white/20" placeholder="https://..." required />
-                {formData.image_url && <div className="mt-2 flex items-center gap-2"><img src={formData.image_url} alt="Preview" className="h-10 w-auto" onError={(e) => e.target.style.display = 'none'} /><span className="text-white/40 text-xs">Preview</span></div>}
+                <Label>Name *</Label>
+                <Input 
+                  value={formData.name} 
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
+                  className="bg-black border-white/20" 
+                  placeholder="e.g. eSewa, Khalti, Bank Transfer" 
+                  required 
+                />
               </div>
-              <div className="flex items-center gap-2"><Switch checked={formData.is_active} onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} /><Label>Active</Label></div>
-              <div className="flex flex-col-reverse sm:flex-row justify-end gap-3">
-                <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)} className="w-full sm:w-auto">Cancel</Button>
-                <Button type="submit" className="bg-gold-500 hover:bg-gold-600 text-black w-full sm:w-auto">{editingMethod ? 'Update' : 'Create'}</Button>
+
+              {/* Logo Upload */}
+              <div className="space-y-2">
+                <Label>Logo/Icon *</Label>
+                <div className="flex gap-3 items-center">
+                  <Input 
+                    value={formData.image_url} 
+                    onChange={(e) => setFormData({ ...formData, image_url: e.target.value })} 
+                    className="bg-black border-white/20 flex-1" 
+                    placeholder="https://... or upload" 
+                  />
+                  <label className="cursor-pointer">
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={(e) => handleImageUpload(e, 'image_url')} 
+                      className="hidden" 
+                    />
+                    <Button type="button" variant="outline" className="border-gold-500 text-gold-500" disabled={isUploading.logo}>
+                      {isUploading.logo ? 'Uploading...' : 'Upload'}
+                    </Button>
+                  </label>
+                </div>
+                {formData.image_url && (
+                  <div className="mt-2 flex items-center gap-2 bg-black/30 rounded-lg p-2">
+                    <img src={formData.image_url} alt="Logo" className="h-10 w-auto" onError={(e) => e.target.style.display = 'none'} />
+                    <span className="text-white/40 text-xs">Logo preview</span>
+                  </div>
+                )}
+              </div>
+
+              {/* QR Code Upload */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <QrCode className="h-4 w-4 text-gold-500" />
+                  QR Code Image
+                </Label>
+                <div className="flex gap-3 items-center">
+                  <Input 
+                    value={formData.qr_code_url} 
+                    onChange={(e) => setFormData({ ...formData, qr_code_url: e.target.value })} 
+                    className="bg-black border-white/20 flex-1" 
+                    placeholder="https://... or upload" 
+                  />
+                  <label className="cursor-pointer">
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={(e) => handleImageUpload(e, 'qr_code_url')} 
+                      className="hidden" 
+                    />
+                    <Button type="button" variant="outline" className="border-gold-500 text-gold-500" disabled={isUploading.qr}>
+                      {isUploading.qr ? 'Uploading...' : 'Upload'}
+                    </Button>
+                  </label>
+                </div>
+                {formData.qr_code_url && (
+                  <div className="mt-2 bg-white rounded-lg p-3 max-w-[150px]">
+                    <img src={formData.qr_code_url} alt="QR Code" className="w-full" />
+                  </div>
+                )}
+              </div>
+
+              {/* Merchant Name */}
+              <div className="space-y-2">
+                <Label>Merchant Name</Label>
+                <Input 
+                  value={formData.merchant_name} 
+                  onChange={(e) => setFormData({ ...formData, merchant_name: e.target.value })} 
+                  className="bg-black border-white/20" 
+                  placeholder="e.g. Game Shop Nepal" 
+                />
+              </div>
+
+              {/* Phone Number */}
+              <div className="space-y-2">
+                <Label>Phone Number</Label>
+                <Input 
+                  value={formData.phone_number} 
+                  onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })} 
+                  className="bg-black border-white/20" 
+                  placeholder="e.g. 9705070222" 
+                />
+              </div>
+
+              {/* Instructions */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-gold-500" />
+                  Payment Instructions
+                </Label>
+                <Textarea 
+                  value={formData.instructions} 
+                  onChange={(e) => setFormData({ ...formData, instructions: e.target.value })} 
+                  className="bg-black border-white/20 min-h-[100px]" 
+                  placeholder="e.g. Put your WhatsApp Number in remarks.
+❌ Not: Netflix, Prime Video, Payment, etc.
+
+⚠️ If instructions are not followed, you will be refunded only 50% of your payment after 12 hours." 
+                />
+                <p className="text-white/40 text-xs">This will be shown to customers during payment</p>
+              </div>
+
+              {/* Active Toggle */}
+              <div className="flex items-center gap-2 pt-2">
+                <Switch 
+                  checked={formData.is_active} 
+                  onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })} 
+                />
+                <Label>Active (visible to customers)</Label>
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
+                <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)} className="w-full sm:w-auto">
+                  Cancel
+                </Button>
+                <Button type="submit" className="bg-gold-500 hover:bg-gold-600 text-black w-full sm:w-auto">
+                  {editingMethod ? 'Update' : 'Create'}
+                </Button>
               </div>
             </form>
           </DialogContent>

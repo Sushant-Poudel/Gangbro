@@ -92,21 +92,11 @@ export const seedAPI = {
   clearProducts: () => api.post('/clear-products'),
 };
 
-export const takeappAPI = {
-  getStore: () => api.get('/takeapp/store'),
-  getOrders: () => api.get('/takeapp/orders'),
-  getOrderStats: () => api.get('/takeapp/orders/stats'),
-  getInventory: () => api.get('/takeapp/inventory'),
-  updateInventory: (itemId, quantity) => api.put(`/takeapp/inventory/${itemId}`, { quantity }),
-  syncProducts: () => api.post('/takeapp/sync-products'),
-  syncOrders: () => api.post('/takeapp/sync-orders'),
-};
-
 export const ordersAPI = {
   create: (data) => api.post('/orders/create', data),
   getAll: () => api.get('/orders'),
-  uploadPaymentScreenshot: (orderId, screenshotUrl) =>
-    api.post(`/orders/${orderId}/payment-screenshot`, { screenshot_url: screenshotUrl }),
+  uploadPaymentScreenshot: (orderId, screenshotUrl, paymentMethod) =>
+    api.post(`/orders/${orderId}/payment-screenshot`, { screenshot_url: screenshotUrl, payment_method: paymentMethod }),
 };
 
 export const promoCodesAPI = {

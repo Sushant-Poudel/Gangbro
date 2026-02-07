@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ShoppingBag, Trash2, Check, Loader2, ExternalLink, Ticket, X } from 'lucide-react';
+import { ArrowLeft, ShoppingBag, Trash2, Loader2, Ticket, X } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,6 @@ export default function CheckoutPage() {
   const { cart, removeFromCart, clearCart, getCartTotal } = useCart();
   
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [orderData, setOrderData] = useState(null);
   const [orderForm, setOrderForm] = useState({ customer_name: '', customer_phone: '', customer_email: '', remark: '' });
   
   // Promo code
@@ -101,10 +100,17 @@ export default function CheckoutPage() {
       };
 
       const res = await ordersAPI.create(orderPayload);
-      setOrderData({ order_id: res.data.order_id, takeapp_order_id: res.data.takeapp_order_id, payment_url: res.data.payment_url });
-      clearCart();
       
-      if (!res.data.payment_url) toast.warning('Order created but payment link not available. Please contact support.');
+      // Redirect to our custom payment page
+      const params = new URLSearchParams({
+        total: total.toFixed(2),
+        items: cart.map(item => `${item.product.name} (${item.variation.name} x${item.quantity})`).join(', '),
+        name: orderForm.customer_name,
+        phone: orderForm.customer_phone
+      });
+      
+      clearCart();
+      navigate(`/payment/${res.data.order_id}?${params.toString()}`);
     } catch (error) {
       console.error('Order error:', error);
       toast.error('Failed to place order. Please try again.');
@@ -114,11 +120,10 @@ export default function CheckoutPage() {
   };
 
   const handleOpenPayment = () => {
-    if (orderData?.payment_url) window.open(orderData.payment_url, '_blank');
-    else toast.error('Payment URL not available');
+    // Removed - we now redirect to /payment/:orderId
   };
 
-  if (cart.length === 0 && !orderData) {
+  if (cart.length === 0) {
     return (
       <div className="min-h-screen bg-black">
         <Navbar />
@@ -129,39 +134,6 @@ export default function CheckoutPage() {
           <Link to="/">
             <Button className="bg-amber-500 hover:bg-amber-600 text-black">{t('browseProducts')}</Button>
           </Link>
-        </div>
-        <Footer />
-      </div>
-    );
-  }
-
-  if (orderData) {
-    return (
-      <div className="min-h-screen bg-black">
-        <Navbar />
-        <div className="pt-24 pb-16 max-w-md mx-auto px-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 text-center">
-            <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Check className="h-8 w-8 text-green-500" />
-            </div>
-            <h1 className="text-xl font-bold text-white mb-2">{t('orderCreated')}</h1>
-            <p className="text-gray-400 text-sm mb-4">
-              {orderData?.takeapp_order_id 
-                ? 'Click below to complete payment on Take.app'
-                : 'Click below to contact us via WhatsApp'}
-            </p>
-            <div className="bg-black/50 rounded-lg p-3 mb-4">
-              <p className="text-gray-400 text-xs">Order ID</p>
-              <p className="text-white font-mono text-sm truncate">{orderData?.takeapp_order_id || orderData?.order_id}</p>
-            </div>
-            <Button onClick={handleOpenPayment} className="w-full bg-amber-500 hover:bg-amber-600 text-black mb-3">
-              <ExternalLink className="w-4 h-4 mr-2" />
-              {orderData?.takeapp_order_id ? 'Complete Payment' : 'Contact WhatsApp'}
-            </Button>
-            <Link to="/">
-              <Button variant="ghost" className="w-full text-gray-400">Continue Shopping</Button>
-            </Link>
-          </div>
         </div>
         <Footer />
       </div>

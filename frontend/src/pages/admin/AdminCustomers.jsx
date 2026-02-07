@@ -9,7 +9,6 @@ import api from '@/lib/api';
 export default function AdminCustomers() {
   const [customers, setCustomers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
 
   const fetchCustomers = async () => {
     try {
@@ -25,19 +24,6 @@ export default function AdminCustomers() {
   useEffect(() => {
     fetchCustomers();
   }, []);
-
-  const handleSyncFromTakeApp = async () => {
-    setIsSyncing(true);
-    try {
-      const res = await api.post('/customers/sync-from-takeapp');
-      toast.success(res.data.message);
-      fetchCustomers();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to sync from Take.app');
-    } finally {
-      setIsSyncing(false);
-    }
-  };
 
   const handleExportCSV = () => {
     const headers = ['Phone', 'Name', 'Email', 'Total Orders', 'Total Spent', 'Created At'];
@@ -72,10 +58,6 @@ export default function AdminCustomers() {
           <div className="flex gap-2">
             <Button onClick={handleExportCSV} variant="outline" className="border-zinc-700 text-white">
               <Download className="w-4 h-4 mr-2" /> Export CSV
-            </Button>
-            <Button onClick={handleSyncFromTakeApp} disabled={isSyncing} className="bg-amber-500 hover:bg-amber-600 text-black">
-              <RefreshCw className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
-              Sync from Take.app
             </Button>
           </div>
         </div>

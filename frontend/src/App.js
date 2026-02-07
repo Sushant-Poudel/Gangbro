@@ -7,6 +7,7 @@ import { CustomerProvider } from "@/components/CustomerAccount";
 import HomePage from "@/pages/HomePage";
 import ProductPage from "@/pages/ProductPage";
 import CheckoutPage from "@/pages/CheckoutPage";
+import PaymentPage from "@/pages/PaymentPage";
 import AboutPage from "@/pages/AboutPage";
 import FAQPage from "@/pages/FAQPage";
 import TermsPage from "@/pages/TermsPage";
@@ -21,7 +22,6 @@ import AdminReviews from "@/pages/admin/AdminReviews";
 import AdminFAQs from "@/pages/admin/AdminFAQs";
 import AdminPages from "@/pages/admin/AdminPages";
 import AdminSocialLinks from "@/pages/admin/AdminSocialLinks";
-import AdminTakeApp from "@/pages/admin/AdminTakeApp";
 import AdminPaymentMethods from "@/pages/admin/AdminPaymentMethods";
 import AdminNotificationBar from "@/pages/admin/AdminNotificationBar";
 import AdminBlog from "@/pages/admin/AdminBlog";
@@ -30,6 +30,7 @@ import AdminPricingSettings from "@/pages/admin/AdminPricingSettings";
 import AdminTrustpilot from "@/pages/admin/AdminTrustpilot";
 import AdminAnalytics from "@/pages/admin/AdminAnalytics";
 import AdminCustomers from "@/pages/admin/AdminCustomers";
+import AdminOrders from "@/pages/admin/AdminOrders";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import "@/App.css";
 
@@ -45,6 +46,7 @@ function App() {
                   <Route path="/" element={<HomePage />} />
                   <Route path="/product/:productSlug" element={<ProductPage />} />
                   <Route path="/checkout" element={<CheckoutPage />} />
+                  <Route path="/payment/:orderId" element={<PaymentPage />} />
                   <Route path="/about" element={<AboutPage />} />
                   <Route path="/faq" element={<FAQPage />} />
                   <Route path="/terms" element={<TermsPage />} />
@@ -61,7 +63,6 @@ function App() {
                   <Route path="/admin/faqs" element={<ProtectedRoute><AdminFAQs /></ProtectedRoute>} />
                   <Route path="/admin/pages" element={<ProtectedRoute><AdminPages /></ProtectedRoute>} />
                   <Route path="/admin/social-links" element={<ProtectedRoute><AdminSocialLinks /></ProtectedRoute>} />
-                  <Route path="/admin/takeapp" element={<ProtectedRoute><AdminTakeApp /></ProtectedRoute>} />
                   <Route path="/admin/payment-methods" element={<ProtectedRoute><AdminPaymentMethods /></ProtectedRoute>} />
                   <Route path="/admin/notification-bar" element={<ProtectedRoute><AdminNotificationBar /></ProtectedRoute>} />
                   <Route path="/admin/blog" element={<ProtectedRoute><AdminBlog /></ProtectedRoute>} />
@@ -69,6 +70,7 @@ function App() {
                   <Route path="/admin/pricing" element={<ProtectedRoute><AdminPricingSettings /></ProtectedRoute>} />
                   <Route path="/admin/trustpilot" element={<ProtectedRoute><AdminTrustpilot /></ProtectedRoute>} />
                   <Route path="/admin/customers" element={<ProtectedRoute><AdminCustomers /></ProtectedRoute>} />
+                  <Route path="/admin/orders" element={<ProtectedRoute><AdminOrders /></ProtectedRoute>} />
                 </Routes>
               </BrowserRouter>
               <Toaster position="top-right" richColors />
