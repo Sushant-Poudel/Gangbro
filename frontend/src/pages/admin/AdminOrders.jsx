@@ -331,6 +331,79 @@ export default function AdminOrders() {
                       </div>
                     </div>
 
+                    {/* Payment Screenshot Section */}
+                    {order.payment_screenshot && (
+                      <div className="mt-6">
+                        <h4 className="text-white font-semibold uppercase text-sm tracking-wider mb-3 flex items-center gap-2">
+                          <Image className="h-4 w-4 text-gold-500" />
+                          Payment Screenshot
+                        </h4>
+                        <div className="bg-black/50 rounded-lg p-4">
+                          <div className="flex items-start gap-4">
+                            <a 
+                              href={`${getBackendUrl()}${order.payment_screenshot}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block"
+                            >
+                              <img 
+                                src={`${getBackendUrl()}${order.payment_screenshot}`}
+                                alt="Payment Screenshot"
+                                className="max-w-[200px] max-h-[200px] rounded-lg border border-white/20 hover:border-gold-500 transition-colors"
+                              />
+                            </a>
+                            <div className="space-y-2">
+                              <p className="text-white/60 text-sm">
+                                <span className="text-white">Payment Method:</span> {order.payment_method || 'N/A'}
+                              </p>
+                              <p className="text-white/60 text-sm">
+                                <span className="text-white">Uploaded:</span> {formatDate(order.payment_uploaded_at)}
+                              </p>
+                              <a 
+                                href={`${getBackendUrl()}${order.payment_screenshot}`}
+                                download
+                                className="inline-flex items-center gap-1 text-gold-500 hover:text-gold-400 text-sm"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                                Download Screenshot
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Invoice Link */}
+                    {order.invoice_url && (
+                      <div className="mt-4">
+                        <a 
+                          href={order.invoice_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 bg-gold-500/10 text-gold-500 px-4 py-2 rounded-lg hover:bg-gold-500/20 transition-colors"
+                        >
+                          <FileText className="h-4 w-4" />
+                          View Invoice
+                        </a>
+                      </div>
+                    )}
+
+                    {/* Complete Order Button */}
+                    {order.status === 'Confirmed' && (
+                      <div className="mt-4">
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCompleteOrder(order);
+                          }}
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Mark as Completed & Send Invoice Email
+                        </Button>
+                      </div>
+                    )}
+
                     {/* Status History */}
                     {order.status_history && order.status_history.length > 0 && (
                       <div className="mt-6">
