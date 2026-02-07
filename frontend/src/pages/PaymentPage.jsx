@@ -128,28 +128,33 @@ export default function PaymentPage() {
       const response = await ordersAPI.uploadPaymentScreenshot(orderId, screenshotUrl, selectedMethod?.name);
       const invoiceUrl = response.data.invoice_url;
 
-      // Calculate order values
-      const subtotal = parseFloat(unitPrice) * parseInt(quantity);
-      const serviceCharge = 0; // Can be configured
-      const taxRate = 0.05; // 5%
+      // Calculate order values from orderData state
+      const unitPriceNum = parseFloat(orderData.unitPrice) || 0;
+      const quantityNum = parseInt(orderData.quantity) || 1;
+      const subtotal = unitPriceNum * quantityNum;
+      const serviceCharge = 0;
+      const taxRate = 0.05;
       const tax = subtotal * taxRate;
-      const total = parseFloat(orderTotal);
+      const total = parseFloat(orderData.total) || subtotal;
 
       // Generate WhatsApp message in the specified format
       const siteUrl = window.location.origin;
       const fullInvoiceUrl = `${siteUrl}/invoice/${orderId}`;
       
+      const productDisplay = orderData.productName || 'Product';
+      const variationDisplay = orderData.variationName ? ` - ${orderData.variationName}` : '';
+      
       const whatsappMessage = `*#${orderId.slice(0, 8).toUpperCase()}*
 
-*${quantity}x* ${productName}${variationName ? ` - ${variationName}` : ''} – Rs ${parseFloat(unitPrice).toLocaleString()}
+*${quantityNum}x* ${productDisplay}${variationDisplay} – Rs ${unitPriceNum.toLocaleString()}
 
 Item total: Rs ${subtotal.toLocaleString()}
 Subtotal: Rs ${subtotal.toLocaleString()}
 Service Charge: Rs ${serviceCharge.toLocaleString()}
-Tax 5%: Rs ${tax.toLocaleString()}
+Tax 5%: Rs ${tax.toFixed(2)}
 *Total: Rs ${total.toLocaleString()}*
 
-Customer: *${customerName}* ${customerPhone} ${customerEmail}
+Customer: *${orderData.customerName}* ${orderData.customerPhone} ${orderData.customerEmail}
 
 Payment: *${selectedMethod?.name}* (Confirming Payment)
 
