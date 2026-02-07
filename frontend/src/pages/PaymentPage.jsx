@@ -210,8 +210,13 @@ See invoice ${fullInvoiceUrl}`;
           <div className="text-center mb-6 py-4 bg-gradient-to-r from-gold-500/10 to-gold-500/5 rounded-xl border border-gold-500/20">
             <p className="text-white/60 text-sm">Amount to pay</p>
             <p className="text-4xl font-bold text-white mt-1">
-              NPR {parseFloat(orderTotal).toLocaleString()}
+              NPR {parseFloat(orderData.total).toLocaleString()}
             </p>
+            {orderData.productName && (
+              <p className="text-white/50 text-sm mt-2">
+                {orderData.quantity}x {orderData.productName}{orderData.variationName ? ` - ${orderData.variationName}` : ''}
+              </p>
+            )}
           </div>
 
           {/* Step 1: Payment Methods Selection */}
