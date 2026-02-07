@@ -22,6 +22,11 @@ export default function PaymentPage() {
   const orderItems = searchParams.get('items') || '';
   const customerName = searchParams.get('name') || '';
   const customerPhone = searchParams.get('phone') || '';
+  const customerEmail = searchParams.get('email') || '';
+  const productName = searchParams.get('product') || '';
+  const variationName = searchParams.get('variation') || '';
+  const quantity = searchParams.get('qty') || '1';
+  const unitPrice = searchParams.get('price') || '0';
   
   // Screenshot upload
   const [screenshot, setScreenshot] = useState(null);
@@ -90,31 +95,50 @@ export default function PaymentPage() {
       const screenshotUrl = uploadRes.data.url;
       setIsUploading(false);
 
-      // Save screenshot to order with payment method
-      await ordersAPI.uploadPaymentScreenshot(orderId, screenshotUrl, selectedMethod?.name);
+      // Save screenshot to order with payment method - this also sets status to "Confirmed"
+      const response = await ordersAPI.uploadPaymentScreenshot(orderId, screenshotUrl, selectedMethod?.name);
+      const invoiceUrl = response.data.invoice_url;
 
-      // Generate WhatsApp message
+      // Calculate order values
+      const subtotal = parseFloat(unitPrice) * parseInt(quantity);
+      const serviceCharge = 0; // Can be configured
+      const taxRate = 0.05; // 5%
+      const tax = subtotal * taxRate;
+      const total = parseFloat(orderTotal);
+
+      // Generate WhatsApp message in the specified format
+      const siteUrl = window.location.origin;
+      const fullInvoiceUrl = `${siteUrl}/invoice/${orderId}`;
+      
+      const whatsappMessage = `*#${orderId.slice(0, 8).toUpperCase()}*
+
+*${quantity}x* ${productName}${variationName ? ` - ${variationName}` : ''} – Rs ${parseFloat(unitPrice).toLocaleString()}
+
+Item total: Rs ${subtotal.toLocaleString()}
+Subtotal: Rs ${subtotal.toLocaleString()}
+Service Charge: Rs ${serviceCharge.toLocaleString()}
+Tax 5%: Rs ${tax.toLocaleString()}
+*Total: Rs ${total.toLocaleString()}*
+
+Customer: *${customerName}* ${customerPhone} ${customerEmail}
+
+Payment: *${selectedMethod?.name}* (Confirming Payment)
+
+See invoice ${fullInvoiceUrl}`;
+
+      const encodedMessage = encodeURIComponent(whatsappMessage);
       const whatsappNumber = '9779743488871';
-      const message = `🛒 *New Order Payment*
-
-📦 *Order ID:* ${orderId}
-👤 *Name:* ${customerName}
-📞 *Phone:* ${customerPhone}
-
-💳 *Payment Method:* ${selectedMethod?.name}
-💰 *Amount:* NPR ${parseFloat(orderTotal).toLocaleString()}
-
-📝 *Items:* ${orderItems}
-
-✅ Payment screenshot uploaded!
-
-Please verify and process my order. 🙏`;
-
-      const encodedMessage = encodeURIComponent(message);
+      
+      // Open WhatsApp with pre-filled message
       window.open(`https://wa.me/${whatsappNumber}?text=${encodedMessage}`, '_blank');
       
-      toast.success('Order submitted! Please complete the conversation on WhatsApp.');
-      navigate('/');
+      toast.success('Order confirmed! Redirecting to WhatsApp...');
+      
+      // Navigate to invoice page after a short delay
+      setTimeout(() => {
+        navigate(`/invoice/${orderId}`);
+      }, 1500);
+      
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to process order. Please try again.');
@@ -192,12 +216,6 @@ Please verify and process my order. 🙏`;
           {/* Step 2: Payment Details */}
           {step === 'details' && selectedMethod && (
             <div className="space-y-4" data-testid="payment-details">
-              {/* Timer Warning */}
-              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3 flex items-center justify-between">
-                <p className="text-white text-sm">Order will be cancelled if you don't complete payment</p>
-                <span className="text-red-400 font-mono font-bold">00:10:00</span>
-              </div>
-
               {/* QR Code Section */}
               <div className="bg-card border border-white/10 rounded-xl p-6">
                 <div className="flex items-center gap-2 mb-4">
@@ -265,11 +283,11 @@ Please verify and process my order. 🙏`;
 
                 {/* Payment Instructions */}
                 {selectedMethod.instructions && (
-                  <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+                  <div className="mt-4 bg-gold-500/10 border border-gold-500/30 rounded-xl p-4">
                     <div className="flex items-start gap-2">
                       <span className="text-lg">📢</span>
                       <div>
-                        <p className="text-white font-bold uppercase tracking-wider text-sm mb-2">Payment Instructions</p>
+                        <p className="text-gold-500 font-bold uppercase tracking-wider text-sm mb-2">Payment Instructions</p>
                         <div className="text-white/80 text-sm whitespace-pre-line">
                           {selectedMethod.instructions}
                         </div>
@@ -328,13 +346,13 @@ Please verify and process my order. 🙏`;
               <div className="bg-card border border-white/10 rounded-xl p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <div className="w-6 h-6 bg-gold-500 rounded-full flex items-center justify-center text-black font-bold text-sm">3</div>
-                  <span className="text-white font-semibold">Did you pay?</span>
+                  <span className="text-white font-semibold">Confirm your payment</span>
                 </div>
                 
                 <Button
                   onClick={handleProcessOrder}
                   disabled={!screenshot || isSubmitting}
-                  className="w-full bg-black hover:bg-black/80 text-white py-6 text-lg font-semibold disabled:opacity-50"
+                  className="w-full bg-green-600 hover:bg-green-700 text-white py-6 text-lg font-semibold disabled:opacity-50"
                   data-testid="process-order-btn"
                 >
                   {isSubmitting ? (
@@ -345,10 +363,14 @@ Please verify and process my order. 🙏`;
                   ) : (
                     <>
                       <MessageCircle className="h-5 w-5 mr-2" />
-                      I have paid
+                      I have Paid
                     </>
                   )}
                 </Button>
+                
+                <p className="text-white/40 text-xs text-center mt-3">
+                  You'll be redirected to WhatsApp to confirm your payment
+                </p>
               </div>
             </div>
           )}
